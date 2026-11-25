@@ -23,10 +23,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class NarradorService {
     private static final Logger LOG = LoggerFactory.getLogger(NarradorService.class);
+    private static final Duration ESPERA_MODELO = Duration.ofSeconds(90);
     private static final Pattern CONSULTA = Pattern.compile(
             "^(?:qué|que significa|cuál|cual|cómo|como|dónde|donde|a qué|a que|por qué|por que|"
             + "explica|explícame|explicame|define|dime qué|dime que|me puedes explicar|puedes explicar|"
             + "what|which|where|how|why|can you explain|could you explain|tell me|explain)\\b");
+    private static final Pattern CONSULTA_SIGNIFICADO = Pattern.compile(
+            "\\b(?:qu[eé] significa|(?:a )?qu[eé] te refieres|what .+ means|what .*mean|meaning of)\\b");
     private final ChatClient cliente;
     private final HistorialService historial;
     private final String prompt;
@@ -44,6 +47,27 @@ public class NarradorService {
 
     public ResultadoAccion conversar(EscapeSession partida, String entrada, boolean accion, Consumer<String> fragmentos) {
         return partida.enTurno(() -> narrarTurno(partida, entrada.strip(), accion, fragmentos));
+    }
+
+    public ResultadoAccion narrarEscena(ResultadoAccion verificado, Consumer<String> fragmentos) {
+        StringBuilder texto = new StringBuilder();
+        agregar(texto, fragmentos, verificado.mensaje());
+        if (cliente != null && "PLAYING".equals(verificado.estado().resultado())) {
+            var peticion = cliente.prompt()
+                    .system("Eres el guardián amable e irónico de una cripta gótica. Idioma: "
+                            + verificado.estado().idioma()
+                            + ". Añade una frase ambiental corta sin alterar los hechos ni repetir el mensaje.")
+                    .user("La acción ya se ejecutó. Resultado: " + verificado.mensaje());
+            StringBuilder ambientacion = new StringBuilder();
+            emitirModelo(peticion, fragmento -> {
+                String salida = ambientacion.isEmpty() ? "\n\n" + fragmento : fragmento;
+                ambientacion.append(fragmento);
+                texto.append(salida);
+                fragmentos.accept(salida);
+            });
+        }
+        completarResultado(texto, fragmentos, verificado.pista(), verificado.diagnostico());
+        return new ResultadoAccion(texto.toString(), verificado.estado(), verificado.pista(), verificado.diagnostico());
     }
 
     private ResultadoAccion narrarTurno(EscapeSession partida, String entrada, boolean accion, Consumer<String> fragmentos) {
@@ -71,14 +95,10 @@ public class NarradorService {
             if (permiteAccion(entrada, accion) && estadoInicial.resultado().equals("PLAYING")) {
                 peticion.tools(herramientas);
             }
-            try {
-                peticion.stream().content().timeout(Duration.ofSeconds(30)).toIterable().forEach(fragmento -> {
-                    texto.append(fragmento);
-                    fragmentos.accept(fragmento);
-                });
-            } catch (RuntimeException e) {
-                LOG.warn("El narrador no completó el turno", e);
-            }
+            emitirModelo(peticion, fragmento -> {
+                texto.append(fragmento);
+                fragmentos.accept(fragmento);
+            });
         }
         ResultadoAccion verificado = herramientas.ultimaAccion();
         if (texto.isEmpty()) {
@@ -88,17 +108,32 @@ public class NarradorService {
         }
         String pista = verificado == null ? null : verificado.pista();
         String diagnostico = verificado == null ? null : verificado.diagnostico();
-        if (pista != null && texto.indexOf(pista) < 0) {
-            agregar(texto, fragmentos, pista);
-        }
-        agregar(texto, fragmentos, diagnostico);
+        completarResultado(texto, fragmentos, pista, diagnostico);
         historial.registrar(partida, Autor.NARRADOR, texto.toString());
         return new ResultadoAccion(texto.toString(), partida.estado(), pista, diagnostico);
     }
 
     static boolean permiteAccion(String entrada, boolean accion) {
+        String normalizada = entrada.toLowerCase(Locale.ROOT);
         return accion && entrada.indexOf('?') < 0 && entrada.indexOf('¿') < 0
-                && !CONSULTA.matcher(entrada.toLowerCase(Locale.ROOT)).find();
+                && !CONSULTA.matcher(normalizada).find() && !CONSULTA_SIGNIFICADO.matcher(normalizada).find();
+    }
+
+    private void emitirModelo(ChatClient.ChatClientRequestSpec peticion, Consumer<String> fragmentos) {
+        try {
+            peticion.stream().content().timeout(ESPERA_MODELO).toIterable().forEach(fragmentos);
+        } catch (RuntimeException e) {
+            LOG.warn("El narrador no completó el turno", e);
+        }
+    }
+
+    private void completarResultado(StringBuilder texto, Consumer<String> fragmentos, String pista, String diagnostico) {
+        if (pista != null && texto.indexOf(pista) < 0) {
+            agregar(texto, fragmentos, pista);
+        }
+        if (diagnostico != null && texto.indexOf(diagnostico) < 0) {
+            agregar(texto, fragmentos, diagnostico);
+        }
     }
 
     private void agregar(StringBuilder texto, Consumer<String> fragmentos, String añadido) {

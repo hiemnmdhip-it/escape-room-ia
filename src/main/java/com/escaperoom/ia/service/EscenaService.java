@@ -6,6 +6,7 @@ import com.escaperoom.ia.model.EscapeSession;
 import com.escaperoom.ia.model.MensajeHistorial.Autor;
 import com.escaperoom.ia.tools.HerramientasCripta;
 import java.util.Locale;
+import java.util.function.UnaryOperator;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -17,6 +18,11 @@ public class EscenaService {
     }
 
     public ResultadoAccion ejecutar(EscapeSession partida, AccionEscena accion) {
+        return ejecutar(partida, accion, UnaryOperator.identity());
+    }
+
+    public ResultadoAccion ejecutar(EscapeSession partida, AccionEscena accion,
+            UnaryOperator<ResultadoAccion> narrar) {
         return partida.enTurno(() -> {
             var idioma = partida.estado().idioma();
             String elemento = accion.elemento();
@@ -49,15 +55,16 @@ public class EscenaService {
                     ? partida.seleccionar(reliquia == null ? "" : reliquia.strip().toLowerCase(Locale.ROOT))
                     : herramientas.ultimaAccion();
             historial.registrar(partida, Autor.JUGADOR, descripcion);
-            String texto = resultado.mensaje();
-            if (resultado.pista() != null && !resultado.pista().equals(texto)) {
-                texto += "\n" + resultado.pista();
+            ResultadoAccion narrado = narrar.apply(resultado);
+            String texto = narrado.mensaje();
+            if (narrado.pista() != null && !texto.contains(narrado.pista())) {
+                texto += "\n" + narrado.pista();
             }
-            if (resultado.diagnostico() != null) {
-                texto += "\n" + resultado.diagnostico();
+            if (narrado.diagnostico() != null && !texto.contains(narrado.diagnostico())) {
+                texto += "\n" + narrado.diagnostico();
             }
             historial.registrar(partida, Autor.NARRADOR, texto);
-            return resultado;
+            return narrado;
         });
     }
 }

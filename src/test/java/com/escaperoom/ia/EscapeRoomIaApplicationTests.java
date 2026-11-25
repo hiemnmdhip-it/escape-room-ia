@@ -21,10 +21,12 @@ class EscapeRoomIaApplicationTests {
     }
 
     @Test
-    void elPerfilGeminiInstanciaSoloSuModeloSinRealizarSolicitudes() {
-        try (var contexto = aplicacion().run("--spring.profiles.active=gemini",
-                "--spring.ai.google.genai.api-key=solo-pruebas")) {
-            assertEquals("GoogleGenAiChatModel", contexto.getBean(ChatModel.class).getClass().getSimpleName());
+    void unPerfilAdicionalMantieneOllamaLocalComoUnicoModeloDeChat() {
+        try (var contexto = aplicacion().run("--spring.profiles.active=pruebas")) {
+            var modelo = assertInstanceOf(OllamaChatModel.class, contexto.getBean(ChatModel.class));
+            assertEquals(1, contexto.getBeansOfType(ChatModel.class).size());
+            assertEquals("qwen3:8b", modelo.getOptions().getModel());
+            assertEquals("http://127.0.0.1:11434", contexto.getEnvironment().getProperty("spring.ai.ollama.base-url"));
         }
     }
 

@@ -26,7 +26,7 @@ Los registros describen las decisiones de arquitectura del proyecto y los compro
 
 **Contexto.** Una misma intención puede expresarse de varias maneras y en dos idiomas. El modelo puede interpretar el texto y producir una acción propuesta.
 
-**Decisión.** Describir las acciones con métodos `@Tool` y validar la partida, el objetivo, la secuencia del sello y el inventario en el motor. El servidor asocia la llamada con la partida correspondiente mediante el contexto de la herramienta. La respuesta de la herramienta comunica el resultado que guía la narración. Las aclaraciones narrativas conservan el estado y los intentos.
+**Decisión.** Describir las acciones con métodos `@Tool` y validar la partida, el objetivo, la secuencia del sello y el inventario en el motor. El servidor crea una instancia de herramientas asociada a cada turno de la partida. Las acciones estructuradas del navegador ejecutan estas mismas operaciones en Java y luego piden una frase ambiental al modelo. Las aclaraciones narrativas conservan el estado y los intentos.
 
 **Alternativa evaluada.** Una gramática con expresiones regulares puede resolver comandos explícitos. Cada variación lingüística requiere mantener nuevos patrones, especialmente para distinguir preguntas sobre acciones de instrucciones para ejecutarlas.
 
@@ -40,17 +40,17 @@ Los registros describen las decisiones de arquitectura del proyecto y los compro
 
 **Alternativa evaluada.** WebSocket admite mensajes bidireccionales sobre una sola conexión y exige coordinar su ciclo de vida. La comunicación de entrada ya tiene un canal HTTP que encaja con los controladores MVC y los eventos del navegador.
 
-**Consecuencia.** La integración web tendrá que cerrar los emisores al finalizar o desconectar el cliente y manejar errores de proveedor sin que la vista pierda el último estado confirmado.
+**Consecuencia.** La vista recibe los fragmentos de narración y una instantánea final validada. Si el flujo se corta, consulta el estado por HTTP sin reenviar la acción.
 
-## ADR 005. Perfiles para Ollama y Gemini
+## ADR 005. Inferencia exclusiva con Ollama local
 
-**Contexto.** El proyecto debe poder ejecutarse con un modelo local y ofrecer la alternativa remota de Google Gemini.
+**Contexto.** La Fase 2 establece que el juego se ejecuta con inferencia local y sin credenciales externas.
 
-**Decisión.** Activar Ollama por defecto y seleccionar Gemini mediante un perfil. Cargar la credencial de Gemini desde `GEMINI_API_KEY`. Ambos perfiles usan el mismo conjunto de herramientas y la misma lógica de estado.
+**Decisión.** Incluir siempre el perfil `ollama`, usar la API local de Ollama a través de Spring AI y preparar `qwen3:8b` de antemano. La aplicación no descarga modelos al arrancar.
 
-**Alternativa evaluada.** Mantener un único proveedor simplifica la configuración. El modo local facilita una ejecución sin clave y el modo remoto permite aprovechar Gemini cuando el equipo no dispone de un modelo adecuado.
+**Alternativa evaluada.** Gemini, disponible durante la Fase 1, permitía delegar la inferencia a un servicio remoto. Requería una clave y acceso a Internet en partida. Ollama mantiene en el equipo los mensajes y el contexto de cada turno.
 
-**Consecuencia.** Las pruebas unitarias del motor y las herramientas pueden ejecutarse sin contactar con ningún proveedor. Los ensayos de integración con modelos reales requieren la configuración del perfil correspondiente.
+**Consecuencia.** La generación depende de un proceso Ollama local con el modelo instalado. Las pruebas unitarias y MockMvc se ejecutan sin inferencia y las pruebas de narración real requieren el proceso local activo.
 
 ## ADR 006. Historial de partida y memoria conversacional
 

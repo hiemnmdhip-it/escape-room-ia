@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" th:lang="${idioma.name().toLowerCase()}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cripta de Nocturnia</title>
+    <link rel="stylesheet" th:href="@{/css/cripta.css}">
+    <script defer th:src="@{/js/cripta.js}"></script>
+</head>
+<body th:attr="data-api=@{/api/partidas},data-idioma=${idioma}">
+<header class="cabecera">
+    <a class="marca" th:href="@{/}">Cripta de Nocturnia</a>
+    <div class="indicadores">
+        <span data-texto="vitalidad">Vitalidad</span> <strong id="vitalidad">—</strong>
+        <span data-texto="sellos">Sellos</span> <strong id="sellos">—</strong>
+    </div>
+    <div class="acciones-cabecera">
+        <button id="bitacora" type="button" data-texto="bitacora">Bitácora</button>
+        <button id="reiniciar" type="button" data-texto="reiniciar">Reiniciar</button>
+    </div>
+</header>
+<main class="juego">
+    <section class="panel" aria-labelledby="titulo-escena">
+        <div class="escena">
+            <h1 id="titulo-escena" data-texto="cripta">Cámara del Altar Carmesí</h1>
+            <div class="objetos">
+                <button type="button" data-objeto="altar"><span data-texto="altar">Altar de Sangre</span><small></small></button>
+                <button type="button" data-objeto="organ"><span data-texto="organ">Órgano de Runas</span><small></small></button>
+                <button type="button" data-objeto="chandelier"><span data-texto="chandelier">Candelabro</span><small></small></button>
+                <button type="button" data-objeto="chest"><span data-texto="chest">Cofre de Obsidiana</span><small></small></button>
+            </div>
+        </div>
+        <div class="mandos">
+            <h2 data-texto="reliquias">Reliquias</h2>
+            <p data-texto="ayudaEscena">Selecciona una reliquia y pulsa el objeto sobre el que quieras usarla.</p>
+            <div class="fila" id="inventario"></div>
+            <p id="calibracion"></p>
+            <div class="fila">
+                <button type="button" id="recoger" data-texto="recoger">Recoger cáliz</button>
+                <button type="button" id="pista" data-texto="pista">Pedir pista</button>
+            </div>
+            <form class="fila" id="sello-form">
+                <label for="intento" id="etiqueta-intento" data-texto="intento">Intento</label>
+                <input id="intento" required maxlength="40" autocomplete="off">
+                <button type="submit" data-texto="probar">Probar</button>
+            </form>
+        </div>
+    </section>
+    <section class="panel conversacion" aria-labelledby="titulo-chat">
+        <h2 id="titulo-chat" data-texto="entidad">Entidad de la Cripta</h2>
+        <div id="mensajes" class="mensajes" role="log" aria-live="polite"></div>
+        <p id="estado-turno" role="status"></p>
+        <form class="fila" id="chat-form">
+            <label for="texto" class="solo-lector" data-texto="mensaje">Mensaje</label>
+            <input id="texto" required maxlength="2000" autocomplete="off">
+            <button class="principal" type="submit" data-texto="enviar">Enviar</button>
+        </form>
+        <button id="diagnostico" type="button" data-texto="diagnostico" hidden>Ver informe extenso</button>
+    </section>
+</main>
+<dialog id="dialogo-bitacora" aria-labelledby="titulo-bitacora">
+    <h2 id="titulo-bitacora" data-texto="bitacora">Bitácora</h2>
+    <pre id="contenido-bitacora"></pre>
+    <div class="fila">
+        <form method="dialog"><button data-texto="cerrar">Cerrar</button></form>
+        <button type="button" id="descargar" data-texto="descargar">Descargar .txt</button>
+    </div>
+</dialog>
+</body>
+</html>

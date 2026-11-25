@@ -22,6 +22,6 @@ El público principal son estudiantes del ciclo superior de Desarrollo de Aplica
 
 El alcance del producto incluye una escena de cripta interactiva, un inventario seleccionable, un chat narrativo bilingüe y un registro consultable y descargable. Cada elemento de la escena comunica visualmente su estado. Las acciones realizadas en la escena o a través del chat se resuelven con las reglas del mismo motor. La partida dispone de vitalidad y de un contador de acciones sin progreso. Cuando alcanza el umbral previsto, el guardián ofrece una pista que sugiere una estrategia y preserva la deducción.
 
-La Fase 1 establece la configuración de proveedores, el modelo en memoria, las tres pruebas y las herramientas de chat validadas en Java. La API entrega el estado visual en JSON y transmite la conversación por SSE. La fase de interfaz conectará esa API con la presentación gráfica y la bitácora descargable.
+La Fase 1 estableció el motor en memoria, las tres pruebas y las herramientas de chat validadas en Java. La Fase 2 conecta la escena y la bitácora descargable a la API e integra la selección de idioma y el reinicio de partida. La narración se genera con Ollama local y llega al jugador por SSE.
 
 La sesión vive en la memoria de la instancia durante la partida. El historial completo permite recuperar el relato de la partida. La ventana de memoria conversacional conserva los mensajes recientes necesarios para mantener el contexto del diálogo.

@@ -47,7 +47,27 @@ class NarradorServiceTest {
         assertEquals(2, historial.ventana(partida).size());
         assertFalse(NarradorService.permiteAccion("explica el símbolo", true));
         assertFalse(NarradorService.permiteAccion("what is this symbol", true));
+        assertFalse(NarradorService.permiteAccion("Me dices qué significa esta runa", true));
+        assertFalse(NarradorService.permiteAccion("I wonder what this rune means", true));
         assertTrue(NarradorService.permiteAccion("Calibro 70", true));
+    }
+
+    @Test
+    void unaInteraccionEstructuradaEmiteElResultadoAntesDeAmbientarSinHerramientas() {
+        when(modelo.getOptions()).thenReturn(ToolCallingChatOptions.builder().build());
+        when(modelo.stream(any(Prompt.class))).thenReturn(Flux.just(respuesta("La cripta contiene la respiración.")));
+        var verificado = partida.recoger("chalice");
+        var fragmentos = new ArrayList<String>();
+
+        var resultado = narrador().narrarEscena(verificado, fragmentos::add);
+
+        assertEquals(List.of(verificado.mensaje(), "\n\nLa cripta contiene la respiración."), fragmentos);
+        assertEquals(String.join("", fragmentos), resultado.mensaje());
+        assertEquals(verificado.estado(), resultado.estado());
+        var enviado = ArgumentCaptor.forClass(Prompt.class);
+        verify(modelo).stream(enviado.capture());
+        var opciones = assertInstanceOf(ToolCallingChatOptions.class, enviado.getValue().getOptions());
+        assertTrue(opciones.getToolCallbacks() == null || opciones.getToolCallbacks().isEmpty());
     }
 
     @Test

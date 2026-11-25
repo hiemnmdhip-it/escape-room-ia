@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cripta de Nocturnia</title>
+    <link rel="stylesheet" th:href="@{/css/cripta.css}">
+</head>
+<body class="portada">
+<main class="entrada">
+    <h1>Cripta de Nocturnia</h1>
+    <p>Una cámara profanada. Tres sellos. Una voz al otro lado del altar.</p>
+    <nav aria-label="Idioma / Language">
+        <a class="principal" th:href="@{/juego(idioma='ES')}">Entrar en español</a>
+        <a th:href="@{/juego(idioma='EN')}" lang="en">Enter in English</a>
+    </nav>
+</main>
+</body>
+</html>
