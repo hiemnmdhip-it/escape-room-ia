@@ -1,3 +1,9 @@
 spring:
   application:
     name: escape-room-ia
+  profiles:
+    default: ollama
+  ai:
+    model:
+      chat: none
+      embedding: none

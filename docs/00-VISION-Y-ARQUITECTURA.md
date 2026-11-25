@@ -44,7 +44,7 @@ Para garantizar baja latencia y una distribución autónoma sencilla (sin Docker
 ### 4.2. Orquestación de IA y Tool Calling
 
 - **Spring AI + `@Tool` (Function Calling):** Controla las acciones físicas de la cripta (`inspeccionarElemento`, `recogerReliquia`, `usarReliquia`, `resolverSello`, `solicitarPista`) validando la coherencia lógica en Java para evitar alucinaciones.
-- **Perfiles Híbridos (Ollama / Google Gemini):** Configurados en YAML (`application-ollama.yml` local por defecto y `application-gemini.yml` con `GEMINI_API_KEY`).
+- **Perfiles Híbridos (Ollama / Google Gemini):** Configurados en YAML (`application-ollama.yaml` local por defecto y `application-gemini.yaml` con `GEMINI_API_KEY`).
 
 ### 4.3. Streaming, Estado e Historial en Memoria
 
