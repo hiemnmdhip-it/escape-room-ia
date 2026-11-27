@@ -29,9 +29,9 @@ Spring Boot 4.1, Java 21 y Thymeleaf sirven la portada y la partida. Java valida
 ## Compilar y ejecutar en Windows
 
 1. Ejecuta `.\mvnw.cmd clean package` desde la raíz. El comando compila para Java 21, ejecuta JUnit 5 y empaqueta el JAR en `target/`. Si ya tienes Maven en el PATH, el comando equivalente es `mvn clean package`.
-2. Ejecuta `.\iniciar.bat`. El script activa el perfil `ollama` y abre `http://127.0.0.1:8081/` cuando responde la aplicación. Si el juego ya está en marcha, abre la instancia existente. Mantén abierta la consola que arrancó el servidor durante la partida. Puedes cambiar el puerto con la variable de entorno `SERVER_PORT`.
+2. Ejecuta `.\iniciar.bat`. El script busca el JAR junto al lanzador y, si no está allí, en `target/`. Activa el perfil `ollama`, arranca en el puerto 8080 y abre [la portada](http://localhost:8080/) cuando responde la aplicación. Deja libre ese puerto antes de arrancar y mantén abierta la consola durante la partida.
 
-También puedes iniciar el servidor directamente con el JAR.
+Desde la carpeta de entrega basta con ejecutar `iniciar.bat` junto al JAR. También puedes iniciar el servidor directamente. En ese caso se aplica el puerto 8081 configurado en `application.yml`.
 
 ```powershell
 java -jar target/escape-room-ia-0.0.1-SNAPSHOT.jar
@@ -51,14 +51,14 @@ La aplicación incluye siempre el perfil `ollama`. `application-ollama.yml` usa 
 4. Explora y prueba combinaciones a tu ritmo. Usa **Pedir pista** para consultar la orientación del motor o escribe «¿Cómo así?» para que Ollama te explique el criterio con otro ejemplo. Los intentos de los sellos siguen disponibles si Ollama se interrumpe.
 5. Abre **Bitácora** para consultar el historial y descargarlo como `.txt`. Puedes seguir explorando y preguntando sin límite de turnos. El Diagnóstico Pedagógico de Spring AI aparece al completar las tres runas y reunir todas las reliquias. Pulsa **Versión extensa** para ver los ejemplos web.
 
-Puedes probar la API directamente desde PowerShell.
+Puedes probar la API directamente desde PowerShell. El ejemplo usa el puerto 8080 del lanzador. Cambia a 8081 si arrancaste con `java -jar`.
 
 ```powershell
-$partida = Invoke-RestMethod -Method Post 'http://localhost:8081/api/partidas?idioma=ES'
-$base = "http://localhost:8081/api/partidas/$($partida.sessionId)"
+$partida = Invoke-RestMethod -Method Post 'http://localhost:8080/api/partidas?idioma=ES'
+$base = "http://localhost:8080/api/partidas/$($partida.sessionId)"
 Invoke-RestMethod -Method Post "$base/escena" -ContentType 'application/json' -Body '{"tipo":"INSPECCIONAR","elemento":"altar"}'
 Invoke-RestMethod -Method Post "$base/escena" -ContentType 'application/json' -Body '{"tipo":"INSPECCIONAR","elemento":"altar"}'
-Invoke-RestMethod -Method Post "$base/escena" -ContentType 'application/json' -Body '{"tipo":"RESOLVER","sello":1,"intento":"2"}'
+Invoke-RestMethod -Method Post "$base/escena" -ContentType 'application/json' -Body '{"tipo":"PISTA"}'
 Invoke-RestMethod "$base/estado"
 Invoke-RestMethod "$base/historial"
 ```
@@ -67,9 +67,10 @@ Para el chat, envía `POST /api/partidas/{sessionId}/chat` con `{"texto":"¿Qué
 
 ## Documentación
 
-- [Visión original del proyecto](docs/00-VISION-Y-ARQUITECTURA.md)
+- [Visión y alcance de la versión entregada](docs/00-VISION-Y-ARQUITECTURA.md)
 - [Propósito y objetivos](docs/01-PROPOSITO-Y-OBJETIVOS.md)
 - [Decisiones de arquitectura](docs/02-TOMA-DE-DECISIONES.md)
 - [Arquitectura y flujos](docs/03-ARQUITECTURA-Y-FLUJOS.md)
 - [Rutas, herramientas y reglas del escenario](docs/04-API-TOOLS-Y-ESCENARIO.md)
 - [Bitácora y pruebas](docs/05-BITACORA-Y-PRUEBAS.md)
+- [Informe final de entrega](docs/INFORME-FINAL.md)

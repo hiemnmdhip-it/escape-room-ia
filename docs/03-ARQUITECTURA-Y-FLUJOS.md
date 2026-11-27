@@ -7,9 +7,9 @@
 - `service` gestiona las sesiones por UUID, coordina las acciones de escena y la narración, y escribe los mensajes en las dos memorias.
 - `tools` expone las operaciones del juego a Spring AI. Una instancia recibe la sesión y permite ejecutar una operación por turno. Las herramientas de escena devuelven su resultado directamente mediante `returnDirect`. Java conserva la validación de intentos.
 - `model` aplica las reglas y guarda las fases de las tres runas de Spring AI, los sellos completados, el inventario y la selección. También genera las pistas y el diagnóstico en ES o EN.
+- `dto` contiene las instantáneas de estado y los resultados que consume el cliente. `exception` define el error HTTP 404 para sesiones desconocidas.
 
 La sesión registra si el jugador ha revelado la primera inscripción de la runa activa. Examinar el altar o el órgano y aplicar la estaca al candelabro revelan la inscripción correspondiente. Java valida cada elección, avanza a la fase siguiente y reinicia el descubrimiento al abrir otra runa. Una opción incorrecta conserva la fase y envía `runaFallida` en el evento SSE de escena.
-- `dto` contiene las instantáneas de estado y los resultados que consume el cliente. `exception` define el error HTTP 404 para sesiones desconocidas.
 
 ```mermaid
 flowchart LR

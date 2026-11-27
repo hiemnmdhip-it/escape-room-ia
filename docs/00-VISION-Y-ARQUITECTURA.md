@@ -4,13 +4,13 @@
 
 ## 1. Concepto y Propósito
 
-El proyecto consiste en el desarrollo de un **videojuego web interactivo tipo Escape Room** ambientado en una estética gótica neón de terror psicológico, Halloween, vampiros y demonios. El jugador debe escapar de una cripta sellada resolviendo enigmas físicos y mecanismos sobrenaturales que representan problemas reales de lógica, estructuras de datos y algoritmos de programación en Java alineados con el **Grado Superior en Desarrollo de Aplicaciones Web (DAW)** y un nivel técnico intermedio, **sin escribir código**: todo se resuelve interactuando dinámicamente con los elementos visuales de la escena o escribiendo acciones en lenguaje natural a través de un chat integrado.
+Cripta de Nocturnia es un escape room web de estética gótica neón. Sus acertijos introducen conceptos de Spring AI a un público de Desarrollo de Aplicaciones Web (DAW). El jugador deduce las respuestas e interactúa con la escena o el chat sin escribir código.
 
 El propósito de la plataforma abarca tres vertientes principales:
 
-1. **Entrenamiento en lógica y pensamiento algorítmico (Nivel DAW y Avanzado en Java):** Cada sello demoníaco encubre un problema real de programación en Java (búsqueda binaria `O(log n)`, pilas `Deque` LIFO, tablas `HashMap` de frecuencias, máquinas de estados finitos y recorrido de grafos sin ciclos), planteado como un mecanismo físico coherente dentro de la cripta.
-2. **Retroalimentación pedagógica al finalizar la partida.** Al escapar por la última compuerta o confirmar la rendición, el diagnóstico explica las estructuras de datos, los algoritmos y los patrones de Java que representan los sellos. Presenta primero una **explicación resumida** y permite consultar una **versión extensa**.
-3. **Interacción Dual (Escenario Visual + Lenguaje Natural):** Demuestra cómo combinar una escena gráfica interactiva con un agente de IA que actúa simultáneamente como árbitro estricto de estado y narrador en tiempo real.
+1. **Comprensión de Spring AI.** El altar representa la recuperación por significado, el órgano introduce el presupuesto de contexto y la compuerta ilustra la ejecución y comprobación de herramientas. Cada sello exige superar tres fases en orden.
+2. **Retroalimentación pedagógica.** Después de desbloquear las tres runas y reunir todas las reliquias, se abre un diagnóstico resumido que relaciona los acertijos con Spring AI. La versión extensa ofrece ejemplos para aplicaciones web.
+3. **Interacción entre escena y chat.** Java arbitra la partida y Ollama interpreta órdenes de escena y genera las aclaraciones. Las respuestas del chat llegan progresivamente.
 
 ## 2. Ambientación, Estética y Personalidad del Agente
 
@@ -27,7 +27,7 @@ La pantalla de juego (Spring MVC + Thymeleaf + JavaScript ES6+) se divide en dos
 - **Panel Izquierdo — Escenario Interactivo del Videojuego:** Muestra la escena visual de la estancia con elementos clicables (altares, cofres, candelabros, sellos) que reaccionan con animaciones, destellos neón y cambios de estado al pulsarlos, junto con un inventario inferior de reliquias seleccionables para combinarlas con el entorno.
 - **Panel Derecho — Chat Narrativo Conversacional:**
   - *De Escena a Chat:* Hacer clic en un objeto del escenario o usar una reliquia dispara automáticamente la acción en el backend y el narrador describe la reacción en tiempo real.
-  - *De Chat a Escena:* Escribir una orden en texto libre (*"examino el cofre de obsidiana"*, *"uso la estaca de plata en el altar"*) ejecuta las `@Tool` en Java y actualiza visualmente los objetos, el inventario y los sellos en el panel izquierdo.
+  - *De Chat a Escena.* Una orden explícita puede invocar una herramienta, como al escribir «examino el cofre de obsidiana». Java comprueba los argumentos y publica el resultado. Las preguntas se tratan como conversación.
   - Conserva todo el historial de la partida en memoria para visualizarlo en cualquier momento y descargarlo como bitácora (`.txt`).
 
 ## 4. Arquitectura y Decisiones Tecnológicas (Arquitectura MVC)
@@ -38,17 +38,17 @@ Para garantizar baja latencia y una distribución autónoma sencilla (sin Docker
 
 - **Java 21 + Spring Boot 4.1.x + Maven (YAML):** Estructurado estrictamente por capas MVC (`config`, `controller`, `service`, `tools`, `model`, `dto`, `exception`).
 - **Controladores:**
-  - `VistaJuegoController` (`@Controller`): Renderiza las vistas Thymeleaf principales (`index.html`, `juego.html`).
+  - `VistaJuegoController` (`@Controller`) renderiza `inicio.html` y `juego.html` con Thymeleaf.
   - `PartidaApiController` (`@RestController`): Gestiona creación/reinicio de partidas, ejecución de acciones desde escenario o chat mediante streaming SSE, consulta de estado visual, historial en memoria e informe algorítmico final.
 
 ### 4.2. Orquestación de IA y Tool Calling
 
-- **Spring AI + `@Tool` (Function Calling):** Controla las acciones físicas de la cripta (`inspeccionarElemento`, `recogerReliquia`, `usarReliquia`, `resolverSello`, `solicitarPista`) validando la coherencia lógica en Java para evitar alucinaciones.
+- **Spring AI y herramientas.** Una orden aceptada puede ofrecer al modelo `inspeccionarElemento`, `recogerReliquia` y `usarReliquia`. Java valida las acciones y procesa directamente las elecciones de los sellos y el botón de pista.
 - **Inferencia local con Ollama.** Spring AI usa el modelo `qwen3:8b` en `127.0.0.1:11434`. La configuración se carga a través del perfil `ollama`.
 
 ### 4.3. Streaming, Estado e Historial en Memoria
 
-- **Streaming en Tiempo Real:** SSE (`SseEmitter` o `Flux<String>`) consumido desde JavaScript ES6+ mediante `Fetch API` (`ReadableStream`).
-- **Estado concurrente.** Cada `EscapeSession` se indexa por UUID. Conserva la cámara actual, el estado visual de la escena, los sellos, el inventario, las jugadas consecutivas sin avance y el historial cronológico. El historial usa `CopyOnWriteArrayList<MensajeHistorial>` y se sincroniza con `MessageWindowChatMemory`.
+- **Streaming.** Spring MVC publica con `SseEmitter` el texto progresivo y el estado devuelto por Java. La conversación usa el flujo de Spring AI y las respuestas del motor se transmiten en fragmentos. JavaScript consume ambos mediante Fetch.
+- **Estado concurrente.** Cada `EscapeSession` se indexa por UUID y conserva idioma, progreso, inventario, intentos sin avance e historial. La bitácora usa `CopyOnWriteArrayList<MensajeHistorial>` y se registra también en una ventana Spring AI de 20 mensajes.
 - **Frontend:** Thymeleaf + HTML5 + CSS3 (estética gótica neón basada en el prototipo de referencia) + JavaScript ES6+ Vanilla.
-- **Entrega Autónoma:** JAR ejecutable (`mvn clean package`), script `iniciar.bat` para Windows, `.zip` de entrega y repositorio Git limpio.
+- **Entrega local.** La carpeta de entrega contiene el JAR ejecutable, el lanzador de Windows, el README y la documentación técnica. El lanzador abre `http://localhost:8080/`. El arranque directo con Java usa el puerto 8081 por defecto.

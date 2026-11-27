@@ -40,7 +40,7 @@ Los registros describen las decisiones de arquitectura del proyecto y los compro
 
 **Alternativa evaluada.** WebSocket admite mensajes bidireccionales sobre una sola conexión y exige coordinar su ciclo de vida. La comunicación de entrada ya tiene un canal HTTP que encaja con los controladores MVC y los eventos del navegador. Una llamada completa seguida de un troceado retrasa todo el texto hasta el final de la inferencia.
 
-**Consecuencia.** La vista refleja el resultado validado de una acción directa de escena antes de que el proveedor termine de ambientarla. Los fragmentos de narración llegan después y el evento `estado` cierra el turno. Si el flujo se corta, el navegador consulta el estado por HTTP sin reenviar la acción.
+**Consecuencia.** Una acción validada actualiza la escena mediante el evento `escena`. Los fragmentos `texto` siguen el resultado y el evento `estado` cierra el turno. Si el flujo se corta, el navegador consulta el estado por HTTP sin reenviar la acción.
 
 ## ADR 005. Inferencia local con Ollama
 
@@ -66,7 +66,7 @@ Los registros describen las decisiones de arquitectura del proyecto y los compro
 
 **Contexto.** El jugador debe razonar sobre recuperación semántica, contexto conversacional y comprobación de invocaciones dentro de una escena gótica.
 
-**Decisión.** Cada sello se descubre en la escena, plantea un ajuste y exige una decisión final. Java valida las opciones antes de actualizar la fase. El altar usa datos didácticos de similitud y la compuerta plantea un contrato de salida tipada. El órgano representa el presupuesto de tokens con cifras pequeñas que el jugador puede calcular mentalmente.
+**Decisión.** Revelar un sello en la escena presenta la primera pregunta. Java valida tres elecciones en orden antes de desbloquear cada runa. El altar usa datos didácticos de similitud y la compuerta plantea un contrato de salida tipada. El órgano expresa el presupuesto como suspiros de un fuelle y explica su equivalencia técnica en el diagnóstico.
 
 **Alternativas evaluadas.** Una búsqueda real con embeddings requeriría preparar un corpus y un proveedor de embeddings. Un veredicto generado por el modelo puede incumplir el esquema o contener hechos inventados. Las tablas de datos y los contratos del acertijo permiten repetir y probar la deducción con los mismos criterios en ambos idiomas.
 
@@ -76,7 +76,7 @@ Los registros describen las decisiones de arquitectura del proyecto y los compro
 
 **Contexto.** La partida debe dar margen para deducir, probar y pedir explicaciones. Las jugadas repetidas que no aportan información indican que puede hacer falta una pista.
 
-**Decisión.** Mostrar una pista sutil tras dos intentos consecutivos sin progreso. Las consultas sobre la prueba reciben orientación adicional mientras dure el bloqueo. Las peticiones reiteradas de pista vuelven a mostrar también la inscripción. Avanzar una fase reinicia esa progresión. El diagnóstico se abre al ganar.
+**Decisión.** Mostrar una pista tras dos intentos consecutivos sin progreso. El botón de pista consulta directamente al motor y las preguntas escritas se tratan como conversación. Avanzar una fase reinicia el contador. El diagnóstico se abre al ganar.
 
 **Alternativa evaluada.** Ofrecer una pista en cada turno garantiza visibilidad, aunque revela continuamente la estrategia. Un umbral más alto deja más espacio para experimentar y puede retrasar la orientación hasta después de varias acciones fallidas.
 

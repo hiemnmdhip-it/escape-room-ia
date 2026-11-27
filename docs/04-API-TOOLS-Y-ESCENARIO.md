@@ -2,6 +2,8 @@
 
 ## Vistas y sesiones
 
+El lanzador de Windows sirve la aplicación en `http://localhost:8080`. El arranque directo con `java -jar` usa el puerto 8081 por defecto.
+
 - `GET /` sirve la portada. `GET /juego?idioma=EN` sirve la pantalla de juego. El HUD permite alternar entre `ES` y `EN`. La sesión comienza en `ES` si no se especifica idioma.
 - `POST /api/partidas?idioma=ES` crea una partida y responde HTTP 201 con su `sessionId`. El altar comienza disponible en fase 1.
 - `POST /api/partidas/{sessionId}/reiniciar` responde HTTP 201 con el estado inicial y un UUID nuevo. Conserva el idioma de la partida anterior, salvo que se envíe `?idioma=ES` o `?idioma=EN`. La partida anterior sigue disponible en memoria.
@@ -41,7 +43,7 @@ Cuando `runaFallida` contiene un identificador de escena, el cliente aplica `run
 - `INSPECCIONAR` recibe `elemento`. Examinar individualmente el altar o el órgano en su fase 1 inicia la prueba correspondiente. El botón rápido **Inspeccionar** usa `room` para describir la estancia.
 - `RECOGER` y `SELECCIONAR` reciben `reliquia`. Seleccionar la reliquia activa cancela la selección.
 - `USAR` recibe `reliquia` y `elemento`.
-- `PISTA` devuelve la siguiente pista del sello activo. Comparte la progresión con las peticiones de ayuda en el chat.
+- `PISTA` devuelve una pista del motor o indica cómo revelar el enunciado. Una petición escrita de aclaración sigue el flujo de conversación de Ollama y conserva el progreso.
 - `RESOLVER` recibe `sello` e `intento`. El intento se envía como cadena y se comprueba contra la fase activa.
 
 Un UUID desconocido devuelve HTTP 404. Las solicitudes que incumplen el contrato HTTP devuelven HTTP 400. Los intentos válidos según el contrato que el motor rechaza devuelven un resultado de juego con el motivo y la instantánea actual.
@@ -52,7 +54,7 @@ Un UUID desconocido devuelve HTTP 404. Las solicitudes que incumplen el contrato
 - `recogerReliquia(reliquia)` abre el cofre al recoger `chalice`. La repetición conserva el inventario.
 - `usarReliquia(reliquia, elemento)` comprueba la posesión y la combinación. Las parejas de la cripta son `scroll` con `altar`, `stake` con `chandelier` y `chalice` con `organ`.
 - `resolverSello(sello, intento)` comprueba el sello activo, la fase y la opción escrita por el jugador. Java lo invoca directamente en los turnos de elección.
-- `solicitarPista()` da la orientación de la fase activa. Las siguientes peticiones vuelven a mostrar la inscripción.
+- `solicitarPista()` da la orientación de la fase activa. Si el jugador aún no ha revelado la primera pregunta, indica cómo descubrirla.
 
 El servidor registra herramientas de escena para el modelo al reconocer una orden explícita durante la partida. Cada turno admite una ejecución. Las consultas de significado, fase o inventario usan la escena en modo de lectura, el estado validado y el contexto reciente. Dos errores consecutivos en una fase activan una pista. Las elecciones incorrectas mantienen fase e inventario y publican `runaFallida` con el identificador del objeto.
 

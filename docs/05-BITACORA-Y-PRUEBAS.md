@@ -1,5 +1,7 @@
 # Bitácora y pruebas
 
+Los apartados fechados registran el comportamiento y los resultados de cada revisión. Para el alcance y las evidencias de la entrega actual, consulta el [informe final](INFORME-FINAL.md).
+
 ## Fase 1. Motor, memoria y herramientas
 
 El trabajo partió de un proyecto Maven importado en Spring Tool Suite. La revisión inicial identificó las dependencias, la configuración y las referencias de diseño. La fase incorporó los paquetes MVC, la selección inicial de proveedores, las sesiones en memoria, los sellos encadenados, las herramientas de Spring AI y la personalidad del guardián.
@@ -163,3 +165,9 @@ Examinar el altar o el órgano, o aplicar la estaca al candelabro, revela la pri
 `mvn clean package` terminó con `BUILD SUCCESS` y 34 pruebas JUnit 5, con 0 fallos, 0 errores y 0 omisiones. Las pruebas comprueban el avance y los errores en las nueve fases, el evento SSE de la runa fallida, ambos órdenes de victoria y una aclaración del órgano con un flujo de Ollama simulado. El comando se ejecutó en una copia aislada para conservar las instancias que usaban JAR anteriores bajo `target/`. El JAR verificado se copió a `target/escape-room-ia-0.0.1-SNAPSHOT.jar`. Se usó JDK 25 con destino Java 21.
 
 En Edge se recorrieron las nueve fases y se observó la sacudida al introducir una opción incorrecta en cada una. El chat mostró el enunciado del órgano por fragmentos SSE. Ollama, con el modelo local instalado `llama3:latest`, respondió a una duda sobre el fuelle en el lenguaje de la cripta y la fase permaneció en 2/3. La victoria llegó al recoger el cáliz después de romper los tres sellos. Los hashes del CSS, JavaScript, la vista de juego, el prompt base y los YAML coinciden con los de la versión anterior.
+
+## 27 de noviembre de 2026. Empaquetado de la entrega
+
+`mvn clean package` se ejecutó en la raíz y terminó con `BUILD SUCCESS`. JUnit 5 ejecutó 34 pruebas con 0 fallos, 0 errores y 0 omisiones. El directorio `target/` se dejó con el JAR ejecutable.
+
+Se comprobó el arranque de la copia de entrega desde su lanzador con el perfil `ollama`. La portada y el juego respondieron HTTP 200 en el puerto 8080. El arranque directo conserva el puerto predeterminado 8081. La comprobación HTTP del paquete y la prueba de conversación real en Edge corresponden a verificaciones distintas.
