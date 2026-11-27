@@ -10,6 +10,7 @@ import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.core.env.Profiles;
+import org.springframework.mock.env.MockEnvironment;
 
 class EscapeRoomIaApplicationTests {
     @Test
@@ -32,6 +33,7 @@ class EscapeRoomIaApplicationTests {
 
     private SpringApplicationBuilder aplicacion() {
         return new SpringApplicationBuilder(EscapeRoomIaApplication.class).web(WebApplicationType.NONE)
-                .properties("spring.main.banner-mode=off");
+                .environment(new MockEnvironment())
+                .properties("spring.main.banner-mode=off", "spring.config.location=classpath:/application.yml");
     }
 }

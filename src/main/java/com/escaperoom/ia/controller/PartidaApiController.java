@@ -11,8 +11,10 @@ import com.escaperoom.ia.service.PartidasService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -66,6 +68,21 @@ public class PartidaApiController {
         return new InformeDiagnostico(informe);
     }
 
+    @GetMapping(path = "/{sessionId}/bienvenida", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter bienvenida(@PathVariable String sessionId) {
+        var partida = partidas.obtener(sessionId);
+        return transmitir((emitir, alEjecutar) -> narrador.emitirBienvenida(partida, emitir));
+    }
+
+    @GetMapping(path = "/{sessionId}/diagnostico/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter diagnosticoStream(@PathVariable String sessionId,
+            @RequestParam(defaultValue = "false") boolean extenso) {
+        var partida = partidas.obtener(sessionId);
+        var resultado = partida.enTurno(() ->
+                new ResultadoAccion(diagnostico(sessionId, extenso).informe(), partida.estado(), null, null));
+        return transmitir((emitir, alEjecutar) -> narrador.emitirResultado(resultado, emitir));
+    }
+
     @PatchMapping("/{sessionId}/idioma")
     public EstadoPartida idioma(@PathVariable String sessionId, @RequestParam Idioma idioma) {
         var partida = partidas.obtener(sessionId);
@@ -82,22 +99,38 @@ public class PartidaApiController {
     }
 
     private static void validarEscena(AccionEscena accion) {
-        if (accion.tipo() == AccionEscena.Tipo.RESOLVER && accion.sello() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta el número de sello");
+        boolean incompleta = switch (accion.tipo()) {
+            case INSPECCIONAR -> vacio(accion.elemento());
+            case RECOGER, SELECCIONAR -> vacio(accion.reliquia());
+            case USAR -> vacio(accion.reliquia()) || vacio(accion.elemento());
+            case RESOLVER -> accion.sello() == null || vacio(accion.intento());
+            case PISTA -> false;
+        };
+        if (incompleta) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Faltan datos para ejecutar la acción");
         }
+    }
+
+    private static boolean vacio(String valor) {
+        return valor == null || valor.isBlank();
     }
 
     @PostMapping(path = "/{sessionId}/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chat(@PathVariable String sessionId, @Valid @RequestBody MensajeChat mensaje) {
-        if ((mensaje.texto() == null) == (mensaje.escena() == null)
-                || (mensaje.texto() != null && mensaje.texto().isBlank())
-                || (mensaje.escena() != null && mensaje.accion() != null)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Envía texto o una acción de escena");
-        }
+        mensaje.validar();
         if (mensaje.escena() != null) {
             validarEscena(mensaje.escena());
         }
         var partida = partidas.obtener(sessionId);
+        return transmitir((emitir, alEjecutar) -> mensaje.escena() == null
+                ? narrador.conversar(partida, mensaje.texto(), Boolean.TRUE.equals(mensaje.accion()), emitir, alEjecutar)
+                : escena.ejecutar(partida, mensaje.escena(), verificado -> {
+                    alEjecutar.accept(verificado);
+                    return narrador.emitirResultado(verificado, emitir);
+                }));
+    }
+
+    private SseEmitter transmitir(BiFunction<Consumer<String>, Consumer<ResultadoAccion>, ResultadoAccion> turno) {
         var emisor = new SseEmitter(120_000L);
         var conectado = new AtomicBoolean(true);
         emisor.onCompletion(() -> conectado.set(false));
@@ -108,12 +141,10 @@ public class PartidaApiController {
         });
         Thread.startVirtualThread(() -> {
             try {
-                Consumer<String> emitir = texto -> enviar(emisor, conectado, "texto", texto);
-                var resultado = mensaje.escena() == null
-                        ? narrador.conversar(partida, mensaje.texto(), Boolean.TRUE.equals(mensaje.accion()), emitir)
-                        : escena.ejecutar(partida, mensaje.escena(),
-                                verificado -> narrador.narrarEscena(verificado, emitir));
-                enviar(emisor, conectado, "estado", resultado);
+                var texto = narrador.transmitir(
+                        emitir -> turno.apply(emitir, verificado -> enviar(emisor, conectado, "escena", verificado)),
+                        resultado -> enviar(emisor, conectado, "estado", resultado));
+                texto.doOnNext(fragmento -> enviar(emisor, conectado, "texto", fragmento)).blockLast();
                 if (conectado.get()) {
                     emisor.complete();
                 }
@@ -129,15 +160,28 @@ public class PartidaApiController {
     private static void enviar(SseEmitter emisor, AtomicBoolean conectado, String evento, Object datos) {
         if (conectado.get()) {
             try {
-                Object contenido = datos instanceof String texto ? " " + texto.replace("\n", "\n ") : datos;
-                emisor.send(SseEmitter.event().name(evento).data(contenido));
+                var mensaje = SseEmitter.event().name(evento);
+                if (datos instanceof String texto) {
+                    // Los bytes preservan UTF-8 incluso si el conversor de cadenas usa otra codificación por defecto.
+                    String lineas = texto.replace("\r\n", "\n").replace('\r', '\n').replace("\n", "\ndata: ");
+                    mensaje.data((" " + lineas).getBytes(StandardCharsets.UTF_8));
+                } else {
+                    mensaje.data(datos);
+                }
+                emisor.send(mensaje);
             } catch (IOException | IllegalStateException e) {
                 conectado.set(false);
             }
         }
     }
 
-    public record MensajeChat(@Size(max = 2000) String texto, Boolean accion, @Valid AccionEscena escena) {}
+    public record MensajeChat(@Size(max = 2000) String texto, Boolean accion, @Valid AccionEscena escena) {
+        void validar() {
+            if (escena == null ? vacio(texto) : texto != null || accion != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Envía texto o una acción de escena");
+            }
+        }
+    }
 
     public record InformeDiagnostico(String informe) {}
 

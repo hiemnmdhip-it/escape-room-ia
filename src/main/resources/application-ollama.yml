@@ -7,6 +7,6 @@ spring:
       init:
         pull-model-strategy: never
       chat:
-        model: qwen3:8b
+        model: ${OLLAMA_MODEL:qwen3:8b}
         think: "false"
         num-predict: 160

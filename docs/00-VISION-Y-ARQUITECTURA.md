@@ -9,7 +9,7 @@ El proyecto consiste en el desarrollo de un **videojuego web interactivo tipo Es
 El propósito de la plataforma abarca tres vertientes principales:
 
 1. **Entrenamiento en lógica y pensamiento algorítmico (Nivel DAW y Avanzado en Java):** Cada sello demoníaco encubre un problema real de programación en Java (búsqueda binaria `O(log n)`, pilas `Deque` LIFO, tablas `HashMap` de frecuencias, máquinas de estados finitos y recorrido de grafos sin ciclos), planteado como un mecanismo físico coherente dentro de la cripta.
-2. **Retroalimentación pedagógica al finalizar la partida:** Al romper todos los sellos (o agotar la vitalidad/intentos), el agente revela qué estructuras de datos, algoritmos o patrones de diseño en Java se resolvieron durante la partida, por qué son más eficientes que una solución ingenua y cómo aplicarlos en una aplicación web real. Por defecto entrega una **explicación resumida**, permitiendo alternar a una **versión extensa** bajo demanda.
+2. **Retroalimentación pedagógica al finalizar la partida.** Al escapar por la última compuerta o confirmar la rendición, el diagnóstico explica las estructuras de datos, los algoritmos y los patrones de Java que representan los sellos. Presenta primero una **explicación resumida** y permite consultar una **versión extensa**.
 3. **Interacción Dual (Escenario Visual + Lenguaje Natural):** Demuestra cómo combinar una escena gráfica interactiva con un agente de IA que actúa simultáneamente como árbitro estricto de estado y narrador en tiempo real.
 
 ## 2. Ambientación, Estética y Personalidad del Agente
@@ -49,6 +49,6 @@ Para garantizar baja latencia y una distribución autónoma sencilla (sin Docker
 ### 4.3. Streaming, Estado e Historial en Memoria
 
 - **Streaming en Tiempo Real:** SSE (`SseEmitter` o `Flux<String>`) consumido desde JavaScript ES6+ mediante `Fetch API` (`ReadableStream`).
-- **Estado Concurrente (`ConcurrentHashMap<String, EscapeSession>`):** Almacena por `UUID` la sala actual, estado visual de cada elemento interactivo, progreso de los 3 sellos algorítmicos, inventario de reliquias, intentos/vitalidad restante, contador de turnos estancados e historial cronológico (`CopyOnWriteArrayList<MensajeHistorial>`), sincronizado con `MessageWindowChatMemory`.
+- **Estado concurrente.** Cada `EscapeSession` se indexa por UUID. Conserva la cámara actual, el estado visual de la escena, los sellos, el inventario, las jugadas consecutivas sin avance y el historial cronológico. El historial usa `CopyOnWriteArrayList<MensajeHistorial>` y se sincroniza con `MessageWindowChatMemory`.
 - **Frontend:** Thymeleaf + HTML5 + CSS3 (estética gótica neón basada en el prototipo de referencia) + JavaScript ES6+ Vanilla.
 - **Entrega Autónoma:** JAR ejecutable (`mvn clean package`), script `iniciar.bat` para Windows, `.zip` de entrega y repositorio Git limpio.

@@ -5,7 +5,6 @@ import com.escaperoom.ia.model.EscapeSession;
 import com.escaperoom.ia.model.Idioma;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -14,8 +13,7 @@ public class PartidasService {
 
     public EscapeSession crear(Idioma idioma) {
         String id = UUID.randomUUID().toString();
-        return partidas.computeIfAbsent(id, clave -> new EscapeSession(clave, idioma,
-                ThreadLocalRandom.current().nextInt(1, EscapeSession.PESO_MAXIMO + 1)));
+        return partidas.computeIfAbsent(id, clave -> new EscapeSession(clave, idioma));
     }
 
     public EscapeSession obtener(String id) {

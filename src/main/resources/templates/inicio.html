@@ -1,19 +1,28 @@
 <!doctype html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Cripta de Nocturnia</title>
-    <link rel="stylesheet" th:href="@{/css/cripta.css}">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cripta de Nocturnia // El Sello de Sangre</title>
+  <link rel="stylesheet" href="/css/cripta.css" th:href="@{/css/cripta.css}" />
 </head>
-<body class="portada">
-<main class="entrada">
-    <h1>Cripta de Nocturnia</h1>
-    <p>Una cámara profanada. Tres sellos. Una voz al otro lado del altar.</p>
-    <nav aria-label="Idioma / Language">
-        <a class="principal" th:href="@{/juego(idioma='ES')}">Entrar en español</a>
-        <a th:href="@{/juego(idioma='EN')}" lang="en">Enter in English</a>
-    </nav>
-</main>
+<body class="cover-page">
+  <div class="embers" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <main class="cover-shell">
+    <section class="cover-hero">
+      <svg class="cover-sigil" viewBox="0 0 160 160" aria-hidden="true">
+        <circle cx="80" cy="80" r="64" fill="none" stroke="#2B2E31" stroke-width="2"/>
+        <circle cx="80" cy="80" r="51" fill="none" stroke="#FF5E00" stroke-width="2" stroke-dasharray="3 7"/>
+        <path d="M80 24 99 58 138 64 110 91 116 130 80 112 44 130 50 91 22 64 61 58Z" fill="none" stroke="#8B6F47" stroke-width="2.5"/>
+        <path d="M80 49v62M55 80h50" stroke="#D90429" stroke-width="3"/>
+        <circle cx="80" cy="80" r="8" fill="#09070D" stroke="#FF5E00" stroke-width="3"/>
+      </svg>
+      <div class="cover-kicker">ESCAPE ROOM CONVERSACIONAL // PROTOTIPO JUGABLE</div>
+      <h1 class="cover-title">CRIPTA DE NOCTURNIA <span>EL SELLO DE SANGRE</span></h1>
+      <p class="cover-copy">Una cámara profanada. Tres sellos algorítmicos. Reliquias que reaccionan al escenario y una entidad que prefiere respuestas claras a discursos heroicos.</p>
+      <a class="cover-enter" href="/juego" th:href="@{/juego}">ENTRAR EN LA CRIPTA <span>→</span></a>
+    </section>
+    <footer class="cover-meta"><span>ESTÉTICA // GÓTICO NEÓN</span><span>INTERACCIÓN // ESCENA + INVENTARIO + CHAT</span><span>TECNOLOGÍA // HTML · CSS · JAVASCRIPT</span></footer>
+  </main>
 </body>
 </html>

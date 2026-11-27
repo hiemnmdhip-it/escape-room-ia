@@ -1,248 +1,461 @@
-'use strict';
+(() => {
+  'use strict';
 
-const textos = {
-    ES: {
-        vitalidad: 'Vitalidad', sellos: 'Sellos', bitacora: 'Bitácora', reiniciar: 'Reiniciar',
-        cripta: 'Cámara del Altar Carmesí', altar: 'Altar de Sangre', organ: 'Órgano de Runas',
-        chandelier: 'Candelabro', chest: 'Cofre de Obsidiana', scroll: 'Pergamino rúnico',
-        stake: 'Estaca de plata', chalice: 'Cáliz de ceniza', reliquias: 'Reliquias',
-        ayudaEscena: 'Selecciona una reliquia y pulsa el objeto sobre el que quieras usarla.',
-        recoger: 'Recoger cáliz', pista: 'Pedir pista', probar: 'Probar', entidad: 'Entidad de la Cripta',
-        mensaje: 'Pregunta o indica qué quieres hacer', jugador: 'Jugador', enviar: 'Enviar', diagnostico: 'Ver informe extenso',
-        cerrar: 'Cerrar', descargar: 'Descargar .txt', READY: 'Activo', LOCKED: 'Bloqueado',
-        SOLVED: 'Resuelto', CLOSED: 'Cerrado', OPEN: 'Abierto', VICTORY: 'Has escapado', DEFEAT: 'Partida terminada',
-        intento: 'Intento', intentos: ['Peso', 'Runa', 'Cámara'], espera: 'La cripta responde…',
-        error: 'Se interrumpió la comunicación con la cripta.', vacia: 'La bitácora está vacía.',
-        lecturas: (min, max, n) => `Balanza · ${min}–${max} · ${n} lecturas restantes`,
-        camara: (actual, visitas) => `Cámara ${actual} · Visitadas: ${visitas}`
+  const $ = selector => document.querySelector(selector);
+  const $$ = selector => Array.from(document.querySelectorAll(selector));
+  const messages = $('#messages');
+  const chatInput = $('#chatInput');
+  const flash = $('#flash');
+  const logModal = $('#logModal');
+  const logText = $('#logText');
+  const base = document.body.dataset.api;
+  const objects = $$('.scene-object');
+  let state;
+  let lang = document.body.dataset.idioma.toLowerCase();
+  let busy = false;
+  let failed = false;
+  let report;
+
+  const i18n = {
+    es: {
+      title:'CRIPTA DE NOCTURNIA // EL SELLO DE SANGRE', subtitle:'SESIÓN: CÁMARA DEL ALTAR CARMESÍ', progress:'AVANCE DE LA CRIPTA', seals:'SELLOS ROTOS', log:'Bitácora', reset:'Reiniciar', relics:'RELIQUIAS', scroll:'Pergamino Rúnico', stake:'Estaca de Plata', empty:'[ Vacío ]', entity:'ENTIDAD DE LA CRIPTA', entitySub:'CANAL RÚNICO ESTABLE', inspect:'Inspeccionar sala', hint:'Pedir pista', send:'ENVIAR', logTitle:'BITÁCORA DE LA CRIPTA', logNote:'Registro de la sesión actual.', download:'Descargar .txt', placeholder:'Escribe qué quieres hacer...', sceneTitle:'LA CÁMARA DEL ALTAR CARMESÍ<small>4 PUNTOS DE INTERÉS DETECTADOS</small>', selected:'Reliquia seleccionada', cleared:'Selección cancelada', obtained:'Reliquia obtenida'
     },
-    EN: {
-        vitalidad: 'Vitality', sellos: 'Seals', bitacora: 'Log', reiniciar: 'Restart',
-        cripta: 'Crimson Altar Chamber', altar: 'Blood Altar', organ: 'Rune Organ',
-        chandelier: 'Chandelier', chest: 'Obsidian Chest', scroll: 'Rune scroll',
-        stake: 'Silver stake', chalice: 'Ash chalice', reliquias: 'Relics',
-        ayudaEscena: 'Select a relic, then click the object you want to use it on.',
-        recoger: 'Collect chalice', pista: 'Ask for a hint', probar: 'Try', entidad: 'Entity of the Crypt',
-        mensaje: 'Ask a question or say what you want to do', jugador: 'Player', enviar: 'Send', diagnostico: 'Read the full report',
-        cerrar: 'Close', descargar: 'Download .txt', READY: 'Active', LOCKED: 'Locked',
-        SOLVED: 'Solved', CLOSED: 'Closed', OPEN: 'Open', VICTORY: 'You escaped', DEFEAT: 'Game over',
-        intento: 'Attempt', intentos: ['Weight', 'Rune', 'Chamber'], espera: 'The crypt is responding…',
-        error: 'Communication with the crypt was interrupted.', vacia: 'The log is empty.',
-        lecturas: (min, max, n) => `Scales · ${min}–${max} · ${n} readings left`,
-        camara: (actual, visitas) => `Chamber ${actual} · Visited: ${visitas}`
+    en: {
+      title:'CRYPT OF NOCTURNIA // THE BLOOD SEAL', subtitle:'SESSION: CRIMSON ALTAR CHAMBER', progress:'CRYPT PROGRESS', seals:'BROKEN SEALS', log:'Journal', reset:'Restart', relics:'RELICS', scroll:'Runic Scroll', stake:'Silver Stake', empty:'[ Empty ]', entity:'CRYPT ENTITY', entitySub:'RUNIC CHANNEL STABLE', inspect:'Inspect room', hint:'Ask for a hint', send:'SEND', logTitle:'CRYPT JOURNAL', logNote:'Record of the current session.', download:'Download .txt', placeholder:'Type what you want to do...', sceneTitle:'THE CRIMSON ALTAR CHAMBER<small>4 POINTS OF INTEREST DETECTED</small>', selected:'Relic selected', cleared:'Selection cleared', obtained:'Relic obtained'
     }
-};
+  };
 
-const porId = id => document.getElementById(id);
-const base = document.body.dataset.api;
-const idioma = document.body.dataset.idioma;
-const traduccion = textos[idioma];
-const objetos = [...document.querySelectorAll('[data-objeto]')];
-const mensajes = porId('mensajes');
-const estadoTurno = porId('estado-turno');
-const dialogo = porId('dialogo-bitacora');
-let estado;
-let ocupado = false;
+  const objectNames = {
+    es:{chandelier:'Candelabro de Llamas Naranjas', altar:'Altar con Balanza de Sangre', organ:'Órgano de Tubos Demoníaco', chest:'Cofre de Obsidiana'},
+    en:{chandelier:'Orange-Flame Chandelier', altar:'Blood-Scale Altar', organ:'Demonic Pipe Organ', chest:'Obsidian Chest'}
+  };
+  const itemNames = {
+    es:{scroll:'Pergamino Rúnico', stake:'Estaca de Plata', chalice:'Cáliz de Ceniza'},
+    en:{scroll:'Runic Scroll', stake:'Silver Stake', chalice:'Chalice of Ash'}
+  };
+  i18n.es.chalice = itemNames.es.chalice;
+  i18n.en.chalice = itemNames.en.chalice;
 
-for (const etiqueta of document.querySelectorAll('[data-texto]')) {
-    etiqueta.textContent = traduccion[etiqueta.dataset.texto];
-}
-porId('texto').placeholder = traduccion.mensaje;
-
-function dibujar() {
-    const finalizada = estado && estado.resultado !== 'PLAYING';
-    porId('chat-form').querySelector('button').disabled = ocupado || !estado;
-    porId('reiniciar').disabled = ocupado;
-    porId('bitacora').disabled = ocupado || !estado;
-    porId('pista').disabled = ocupado || !estado || finalizada;
-    porId('recoger').disabled = ocupado || !estado || finalizada || estado.escena.chest === 'OPEN';
-    porId('sello-form').hidden = !estado || finalizada;
-    porId('sello-form').querySelector('button').disabled = ocupado;
-    porId('diagnostico').hidden = !finalizada;
-    porId('diagnostico').disabled = ocupado;
-    for (const boton of objetos) {
-        boton.disabled = ocupado || !estado;
-        if (estado) {
-            boton.dataset.estado = estado.escena[boton.dataset.objeto];
-            boton.querySelector('small').textContent = traduccion[boton.dataset.estado];
-        }
+  const labels = {
+    es: {
+      online: '● EN LÍNEA', waiting: '● ESCUCHANDO', error: '● CANAL INTERRUMPIDO',
+      report: 'Ver diagnóstico',
+      won: 'SESIÓN SUPERADA',
+      summary: 'Versión resumida', full: 'Versión extensa', close: 'Cerrar', message: 'Mensaje',
+      diagnosis: 'DIAGNÓSTICO PEDAGÓGICO DE SPRING AI', entity: 'ENTIDAD', player: 'TÚ',
+      inspect: 'Examinar', use: 'Usar', ready: 'LISTO', locked: 'SELLADO', closed: 'CERRADO',
+      open: 'ABIERTO', phase: 'Fase', unlocked: 'Desbloqueada',
+      interaction: 'Haz clic en un objeto para examinarlo. Selecciona una reliquia y luego un objeto para usarla.',
+      active: 'Reliquia activa', target: 'Ahora elige un elemento de la sala.',
+      objectTags: ['CANDELABRO', 'ALTAR DE SANGRE', 'ÓRGANO DEMONÍACO', 'COFRE DE OBSIDIANA']
+    },
+    en: {
+      online: '● ONLINE', waiting: '● LISTENING', error: '● CHANNEL INTERRUPTED',
+      report: 'View report',
+      won: 'SESSION CLEARED',
+      summary: 'Summary version', full: 'Extended version', close: 'Close', message: 'Message',
+      diagnosis: 'SPRING AI LEARNING REPORT', entity: 'ENTITY', player: 'YOU',
+      inspect: 'Inspect', use: 'Use', ready: 'READY', locked: 'SEALED', closed: 'CLOSED',
+      open: 'OPEN', phase: 'Phase', unlocked: 'Unlocked',
+      interaction: 'Click an object to inspect it. Select a relic, then a room object to use it.',
+      active: 'Active relic', target: 'Now choose a room object.',
+      objectTags: ['CHANDELIER', 'BLOOD ALTAR', 'DEMONIC ORGAN', 'OBSIDIAN CHEST']
     }
-    if (!estado) return;
-    porId('vitalidad').textContent = `${estado.vitalidad}/10`;
-    porId('sellos').textContent = `${estado.sellosResueltos}/3`;
-    porId('etiqueta-intento').textContent = traduccion.intentos[estado.sellosResueltos] ?? traduccion.intento;
-    const {minimo, maximo, intentosRestantes} = estado.calibracion;
-    porId('calibracion').textContent = finalizada ? traduccion[estado.resultado]
-        : estado.camara ? traduccion.camara(estado.camara, [...estado.visitadas].sort().join(', '))
-            : estado.sellosResueltos === 0 ? traduccion.lecturas(minimo, maximo, intentosRestantes) : '';
-    porId('inventario').replaceChildren(...estado.inventario.map(reliquia => {
-        const boton = document.createElement('button');
-        boton.type = 'button';
-        boton.textContent = traduccion[reliquia];
-        boton.setAttribute('aria-pressed', String(estado.reliquiaSeleccionada === reliquia));
-        boton.disabled = ocupado || finalizada;
-        boton.addEventListener('click', () => turno({escena: {tipo: 'SELECCIONAR', reliquia}}, boton.textContent));
-        return boton;
-    }));
-}
+  };
+  const t = () => labels[lang];
+  const playing = () => state?.resultado === 'PLAYING';
+  const scroll = () => { messages.scrollTop = messages.scrollHeight; };
 
-async function solicitar(url, opciones) {
-    const respuesta = await fetch(url, opciones);
-    if (!respuesta.ok) throw new Error(String(respuesta.status));
-    return respuesta;
-}
+  function translate() {
+    document.documentElement.lang = lang;
+    $('#langBtn').textContent = lang.toUpperCase();
+    $$('[data-i18n]').forEach(node => { node.textContent = i18n[lang][node.dataset.i18n]; });
+    $('#sceneWrap .scene-title').innerHTML = i18n[lang].sceneTitle;
+    chatInput.placeholder = i18n[lang].placeholder;
+    chatInput.setAttribute('aria-label', t().message);
+    $('#closeModal').setAttribute('aria-label', t().close);
+    objects.forEach((node, index) => {
+      node.setAttribute('aria-label', objectNames[lang][node.dataset.object]);
+      node.querySelector('.object-tag').textContent = `[${index + 1}] ${t().objectTags[index]}`;
+    });
+  }
 
-function ruta(sufijo) {
-    return `${base}/${estado.sessionId}/${sufijo}`;
-}
+  function draw() {
+    $('#statusText').textContent = failed ? t().error : busy ? t().waiting : t().online;
+    $('#resetBtn').disabled = busy;
+    $('#langBtn').disabled = busy || !state;
+    $('#logBtn').disabled = busy || !state;
+    $('#chatForm button').disabled = busy || !state;
+    $$('.chip').forEach(button => { button.disabled = busy || !state; });
+    $('[data-quick="hint"]').disabled ||= !playing();
+    const reportButton = $('[data-quick="report"]');
+    reportButton.disabled ||= state?.resultado !== 'VICTORY';
+    reportButton.textContent = t().report;
+    if (!state) return;
 
-async function operar(operacion) {
-    if (ocupado) return;
-    ocupado = true;
-    estadoTurno.textContent = traduccion.espera;
-    dibujar();
+    const count = state.sellosResueltos;
+    const percent = Math.round(count * 100 / 3);
+    $('#progressText').textContent = `${percent} %`;
+    $('#energyFill').style.width = `${percent}%`;
+    $('#sealCount').textContent = `${count} / 3`;
+    objects.forEach(node => {
+      const id = node.dataset.object;
+      const solved = state.escena[id] === 'SOLVED';
+      const phase = state.fasesRunas[id];
+      node.classList.toggle('solved', solved);
+      const label = phase ? (solved ? t().unlocked : `${t().phase} ${phase}/3`)
+        : state.escena.chest === 'OPEN' ? t().open : t().closed;
+      $('#state-' + id).textContent = label;
+      node.setAttribute('aria-label', `${objectNames[lang][id]}. ${label}`);
+    });
+    $('#obj-chest').classList.toggle('open', state.escena.chest === 'OPEN');
+    const chalice = $('[data-item="chalice"]');
+    const acquired = state.inventario.includes('chalice');
+    chalice.classList.toggle('new-item', acquired && chalice.classList.contains('empty'));
+    chalice.classList.toggle('empty', !acquired);
+    chalice.querySelector('div').hidden = !acquired;
+    chalice.querySelector('.empty-label').hidden = acquired;
+    $$('[data-item]').forEach(slot => {
+      const item = slot.dataset.item;
+      const selected = state.reliquiaSeleccionada === item;
+      slot.disabled = busy || !playing() || !state.inventario.includes(item);
+      slot.classList.toggle('selected', selected);
+      slot.setAttribute('aria-pressed', String(selected));
+      slot.title = itemNames[lang][item];
+    });
+    $('#interactionHint').textContent = state.reliquiaSeleccionada
+      ? `${t().active}: ${itemNames[lang][state.reliquiaSeleccionada]}. ${t().target}`
+      : t().interaction;
+  }
+
+  async function request(url, options) {
+    const response = await fetch(url, options);
+    if (!response.ok) throw new Error(String(response.status));
+    return response;
+  }
+
+  const route = path => `${base}/${state.sessionId}/${path}`;
+
+  async function run(task) {
+    if (busy) return;
+    busy = true;
+    failed = false;
+    draw();
     try {
-        await operacion();
-        estadoTurno.textContent = '';
-    } catch {
-        estadoTurno.textContent = traduccion.error;
+      await task();
+    } catch (error) {
+      failed = true;
+      console.error(error);
     } finally {
-        ocupado = false;
-        dibujar();
+      busy = false;
+      draw();
     }
-}
+  }
 
-function burbuja(autor, texto = '') {
-    const bloque = document.createElement('p');
-    bloque.className = 'burbuja';
-    bloque.dataset.autor = autor;
-    bloque.textContent = texto;
-    mensajes.append(bloque);
-    mensajes.scrollTop = mensajes.scrollHeight;
-    return bloque;
-}
+  function message(role, text = '') {
+    const row = document.createElement('div');
+    row.className = `msg ${role}`;
+    if (role !== 'system') {
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = `${role === 'narrator' ? t().entity : t().player} // ${new Date().toLocaleTimeString(lang, {
+        hour: '2-digit', minute: '2-digit'
+      })}`;
+      row.append(meta);
+    }
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    row.append(bubble);
+    messages.append(row);
+    scroll();
+    return bubble;
+  }
 
-async function leerEventos(respuesta, recibir) {
-    const lector = respuesta.body.pipeThrough(new TextDecoderStream()).getReader();
-    let pendiente = '';
+  async function leerEventos(respuesta, recibir) {
+      const lector = respuesta.body.pipeThrough(new TextDecoderStream()).getReader();
+      let pendiente = '';
+      try {
+          while (true) {
+              const {value, done} = await lector.read();
+              if (done) break;
+              pendiente += value;
+              let separador;
+              while ((separador = /\r?\n\r?\n/.exec(pendiente))) {
+                  const lineas = pendiente.slice(0, separador.index).split(/\r?\n/);
+                  const evento = lineas.find(linea => linea.startsWith('event:'))?.slice(6).trim();
+                  const datos = lineas.filter(linea => linea.startsWith('data:'))
+                      .map(linea => linea.slice(5).replace(/^ /, '')).join('\n');
+                  if (evento) recibir(evento, datos);
+                  pendiente = pendiente.slice(separador.index + separador[0].length);
+              }
+          }
+      } finally {
+          lector.releaseLock();
+      }
+  }
+
+  function createReport(extended) {
+    const card = $('#reportTemplate').content.firstElementChild.cloneNode(true);
+    card.querySelector('h3').textContent = t().diagnosis;
+    card.querySelector('small').textContent = t().won;
+    const toggle = card.querySelector('button');
+    toggle.textContent = extended ? t().summary : t().full;
+    toggle.setAttribute('aria-expanded', String(extended));
+    toggle.addEventListener('click', () => run(() => loadReport(!extended)));
+    return card;
+  }
+
+  function formatReport(card, text, extended) {
+    const entries = card.querySelector('.algos');
+    entries.replaceChildren();
+    const lines = text.split('\n').filter(Boolean);
+    if (extended) {
+      for (let index = 0; index < lines.length; index += 2) {
+        const [heading, detail] = lines.slice(index, index + 2);
+        const end = heading.indexOf('. ');
+        addReportEntry(entries, heading.slice(0, end), heading.slice(end + 2) + '\n' + (detail || ''));
+      }
+    } else {
+      for (const line of lines) {
+        const colon = line.indexOf(': ');
+        addReportEntry(entries, colon < 0 ? '' : line.slice(0, colon), colon < 0 ? line : line.slice(colon + 2));
+      }
+    }
+  }
+
+  function addReportEntry(entries, heading, text) {
+    const entry = document.createElement('div');
+    entry.className = 'algo';
+    if (heading) {
+      const title = document.createElement('b');
+      title.textContent = heading;
+      entry.append(title);
+    }
+    const paragraph = document.createElement('p');
+    paragraph.textContent = text;
+    entry.append(paragraph);
+    entries.append(entry);
+  }
+
+  async function loadReport(extended = false) {
+    const previous = report;
+    const card = createReport(extended);
+    addReportEntry(card.querySelector('.algos'), '', '');
+    const paragraph = card.querySelector('.algo p');
+    paragraph.style.whiteSpace = 'pre-wrap';
+    let text = '';
+    const toggle = card.querySelector('button');
+    toggle.disabled = true;
     try {
-        while (true) {
-            const {value, done} = await lector.read();
-            if (done) break;
-            pendiente += value;
-            let fin = pendiente.indexOf('\n\n');
-            while (fin !== -1) {
-                const lineas = pendiente.slice(0, fin).split('\n');
-                const evento = lineas.find(linea => linea.startsWith('event:'))?.slice(6).trim();
-                const datos = lineas.filter(linea => linea.startsWith('data:'))
-                    .map(linea => linea.slice(5).replace(/^ /, '')).join('\n');
-                recibir(evento, datos);
-                pendiente = pendiente.slice(fin + 2);
-                fin = pendiente.indexOf('\n\n');
-            }
+      await stream(route(`diagnostico/stream?extenso=${extended}`), {}, (event, data) => {
+        if (event !== 'texto') return;
+        if (!card.isConnected) {
+          previous?.remove();
+          messages.append(card);
         }
-    } finally {
-        await lector.cancel();
+        text += data;
+        paragraph.textContent = text;
+        scroll();
+      });
+      formatReport(card, text, extended);
+      toggle.disabled = false;
+      report = card;
+      scroll();
+    } catch (error) {
+      if (card.isConnected) {
+        if (previous) card.replaceWith(previous);
+        else card.remove();
+      }
+      throw error;
     }
-}
+  }
 
-function turno(entrada, descripcion) {
-    return operar(async () => {
-        burbuja('jugador', descripcion);
-        let narracion;
-        let confirmado = false;
-        try {
-            const respuesta = await solicitar(ruta('chat'), {
-                method: 'POST',
-                headers: {'Accept': 'text/event-stream', 'Content-Type': 'application/json'},
-                body: JSON.stringify(entrada)
-            });
-            await leerEventos(respuesta, (evento, datos) => {
-                if (evento === 'texto') {
-                    narracion ??= burbuja('narrador');
-                    narracion.textContent += datos;
-                    mensajes.scrollTop = mensajes.scrollHeight;
-                }
-                if (evento === 'estado') {
-                    const resultado = JSON.parse(datos);
-                    estado = resultado.estado;
-                    narracion ??= burbuja('narrador');
-                    narracion.textContent = resultado.mensaje;
-                    confirmado = true;
-                    dibujar();
-                    mensajes.scrollTop = mensajes.scrollHeight;
-                }
-            });
-            if (!confirmado) throw new Error('SSE');
-        } catch (error) {
-            try {
-                estado = await (await solicitar(ruta('estado'))).json();
-            } finally {
-                throw error;
-            }
+  async function stream(url, options, receive) {
+    const response = await request(url, {
+      ...options,
+      headers: {'Accept': 'text/event-stream', ...options.headers}
+    });
+    let confirmed = false;
+    await leerEventos(response, (event, data) => {
+      if (event === 'estado') confirmed = true;
+      receive(event, data);
+    });
+    if (!confirmed) throw new Error('SSE');
+  }
+
+  async function narrate(url, options = {}) {
+    const typing = $('#typingTemplate').content.firstElementChild.cloneNode(true);
+    typing.querySelector('span').textContent = t().entity + '…';
+    messages.append(typing);
+    scroll();
+    let bubble;
+    let text = '';
+    let shaken = false;
+    const render = value => {
+      if (value || bubble) {
+        typing.remove();
+        bubble ??= message('narrator');
+        bubble.textContent = value;
+        scroll();
+      }
+    };
+    try {
+      await stream(url, options, (event, data) => {
+        if (event === 'texto') {
+          text += data;
+          render(text);
+          return;
         }
-    });
-}
+        if (event === 'escena' || event === 'estado') {
+          const result = JSON.parse(data);
+          state = result.estado;
+          draw();
+          if (result.runaFallida && !shaken) {
+            const rune = $('#obj-' + result.runaFallida);
+            if (rune) {
+              shaken = true;
+              rune.classList.remove('rune-failed');
+              rune.getBoundingClientRect();
+              rune.classList.add('rune-failed');
+            }
+          }
+          if (event === 'estado' && result.diagnostico) {
+            const diagnosis = result.diagnostico;
+            render(text.replace(diagnosis, '').trimEnd());
+            report?.remove();
+            report = createReport(false);
+            formatReport(report, diagnosis, false);
+            messages.append(report);
+            scroll();
+          }
+        }
+      });
+    } catch (error) {
+      state = await (await request(route('estado'))).json();
+      if (state.resultado === 'VICTORY' && !report) await loadReport();
+      throw error;
+    } finally {
+      typing.remove();
+    }
+  }
 
-function iniciar() {
-    return operar(async () => {
-        const url = estado ? ruta('reiniciar') : `${base}?idioma=${idioma}`;
-        estado = await (await solicitar(url, {method: 'POST'})).json();
-        mensajes.replaceChildren();
-        porId('intento').value = '';
-        porId('texto').value = '';
+  function turn(input, description) {
+    return run(async () => {
+      message('player', description);
+      await narrate(route('chat'), {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(input)
+      });
     });
-}
+  }
 
-for (const boton of objetos) {
-    boton.addEventListener('click', () => {
-        const elemento = boton.dataset.objeto;
-        const reliquia = estado.reliquiaSeleccionada;
-        boton.classList.add('activado');
-        setTimeout(() => boton.classList.remove('activado'), 550);
-        const escena = reliquia ? {tipo: 'USAR', elemento, reliquia} : {tipo: 'INSPECCIONAR', elemento};
-        turno({escena}, reliquia ? `${traduccion[reliquia]} → ${traduccion[elemento]}` : traduccion[elemento]);
+  function start() {
+    return run(async () => {
+      const url = state ? route('reiniciar') : `${base}?idioma=${lang.toUpperCase()}`;
+      state = await (await request(url, {method: 'POST'})).json();
+      messages.replaceChildren();
+      report = null;
+      chatInput.value = '';
+      await narrate(route('bienvenida'));
     });
-}
+  }
 
-porId('recoger').addEventListener('click', () => turno(
-    {escena: {tipo: 'RECOGER', reliquia: 'chalice'}}, traduccion.recoger));
-porId('pista').addEventListener('click', () => turno({escena: {tipo: 'PISTA'}}, traduccion.pista));
-porId('reiniciar').addEventListener('click', iniciar);
-porId('sello-form').addEventListener('submit', evento => {
-    evento.preventDefault();
-    const campo = porId('intento');
-    const intento = campo.value.trim();
-    if (ocupado || !estado || estado.resultado !== 'PLAYING' || !intento) return;
-    campo.value = '';
-    turno({escena: {tipo: 'RESOLVER', sello: estado.sellosResueltos + 1, intento}}, intento);
-});
-porId('chat-form').addEventListener('submit', evento => {
-    evento.preventDefault();
-    const campo = porId('texto');
-    const texto = campo.value.trim();
-    if (ocupado || !estado || !texto) return;
-    campo.value = '';
-    turno({texto, accion: estado.resultado === 'PLAYING'}, texto);
-});
-porId('diagnostico').addEventListener('click', () => turno({texto: '/diagnostico'}, '/diagnostico'));
-porId('bitacora').addEventListener('click', () => operar(async () => {
-    const historial = await (await solicitar(ruta('historial'))).json();
-    const registro = historial.map(({fecha, autor, texto}) => {
-        const hora = new Date(fecha).toLocaleTimeString(document.documentElement.lang);
-        return `[${hora}] ${autor === 'JUGADOR' ? traduccion.jugador : traduccion.entidad}\n${texto}`;
-    }).join('\n\n');
-    porId('contenido-bitacora').textContent = registro || traduccion.vacia;
-    porId('descargar').disabled = !registro;
-    dialogo.showModal();
-}));
-porId('descargar').addEventListener('click', () => {
-    const url = URL.createObjectURL(new Blob([porId('contenido-bitacora').textContent], {type: 'text/plain;charset=utf-8'}));
-    const enlace = document.createElement('a');
-    enlace.href = url;
-    enlace.download = 'bitacora-cripta-nocturnia.txt';
-    enlace.click();
+  function activate(node) {
+    if (busy || !state) return;
+    const element = node.dataset.object;
+    const item = state.reliquiaSeleccionada;
+    const name = objectNames[lang][element];
+    const x = {organ: '20%', chest: '82%'}[element] || '50%';
+    flash.style.setProperty('--fx-x', x);
+    flash.style.setProperty('--fx-y', element === 'chandelier' ? '24%' : '64%');
+    flash.classList.add('on');
+    setTimeout(() => flash.classList.remove('on'), 220);
+    node.classList.add('focused');
+    setTimeout(() => node.classList.remove('focused'), 520);
+    if (item) {
+      turn({escena: {tipo: 'USAR', elemento: element, reliquia: item}},
+        `${t().use} ${itemNames[lang][item]} → ${name}`);
+    } else if (element === 'chest' && state.escena.chest === 'CLOSED' && playing()) {
+      turn({escena: {tipo: 'RECOGER', reliquia: 'chalice'}}, `${t().inspect} ${name}`);
+    } else {
+      turn({escena: {tipo: 'INSPECCIONAR', elemento: element}}, `${t().inspect} ${name}`);
+    }
+  }
+
+  objects.forEach(node => {
+    node.addEventListener('click', () => activate(node));
+    node.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        activate(node);
+      }
+    });
+  });
+  $$('[data-item]').forEach(slot => slot.addEventListener('click', () => run(async () => {
+    const item = slot.dataset.item;
+    const response = await request(route('escena'), {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tipo: 'SELECCIONAR', reliquia: item})
+    });
+    state = (await response.json()).estado;
+    const toast = $('#toast');
+    toast.textContent = state.reliquiaSeleccionada
+      ? `${i18n[lang].selected} · ${itemNames[lang][item]}` : i18n[lang].cleared;
+    toast.classList.add('show');
+    clearTimeout(toast.hideTimer);
+    toast.hideTimer = setTimeout(() => toast.classList.remove('show'), 1700);
+  })));
+  $('[data-quick="inspect"]').addEventListener('click', () =>
+    turn({escena: {tipo: 'INSPECCIONAR', elemento: 'room'}}, i18n[lang].inspect));
+  $('[data-quick="hint"]').addEventListener('click', () =>
+    turn({escena: {tipo: 'PISTA'}}, i18n[lang].hint));
+  $('[data-quick="report"]').addEventListener('click', () => {
+    if (state?.resultado === 'VICTORY') run(() => loadReport());
+  });
+  $('#chatForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const text = chatInput.value.trim();
+    if (!state || !text || busy) return;
+    chatInput.value = '';
+    turn({texto: text, accion: playing()}, text);
+  });
+  $('#resetBtn').addEventListener('click', start);
+  $('#langBtn').addEventListener('click', () => run(async () => {
+    const next = lang === 'es' ? 'EN' : 'ES';
+    state = await (await request(route(`idioma?idioma=${next}`), {method: 'PATCH'})).json();
+    lang = state.idioma.toLowerCase();
+    translate();
+    if (report) await loadReport(report.querySelector('button').getAttribute('aria-expanded') === 'true');
+  }));
+  $('#logBtn').addEventListener('click', () => run(async () => {
+    const history = await (await request(route('historial'))).json();
+    logText.textContent = history.map(({fecha, autor, texto}) =>
+      `[${new Date(fecha).toLocaleTimeString(lang)}] ${autor === 'JUGADOR' ? t().player : t().entity}\n${texto}`)
+      .join('\n\n');
+    logModal.classList.add('open');
+    $('#closeModal').focus();
+  }));
+  function closeLog() {
+    logModal.classList.remove('open');
+    $('#logBtn').focus();
+  }
+  $('#closeModal').addEventListener('click', closeLog);
+  logModal.addEventListener('click', event => { if (event.target === logModal) closeLog(); });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && logModal.classList.contains('open')) closeLog();
+  });
+  $('#downloadLog').addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([logText.textContent], {type: 'text/plain;charset=utf-8'}));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'bitacora-cripta-nocturnia.txt';
+    link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-});
+  });
 
-iniciar();
+  translate();
+  start();
+})();

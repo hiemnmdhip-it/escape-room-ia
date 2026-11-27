@@ -2,51 +2,36 @@ package com.escaperoom.ia.model;
 
 import com.escaperoom.ia.dto.EstadoPartida;
 import com.escaperoom.ia.dto.ResultadoAccion;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 public final class EscapeSession {
-    private static final int PESO_MINIMO = 1;
-    public static final int PESO_MAXIMO = 100;
-    private static final int INTENTOS_CALIBRACION = Integer.SIZE - Integer.numberOfLeadingZeros(PESO_MAXIMO);
     private static final int UMBRAL_PISTA = 2;
-    private static final List<String> ACTIVACION_RUNAS = List.of("A", "Z", "R", "A");
+    private static final List<PruebaCripta> PRUEBAS = List.of(
+            PruebaCripta.FRAGMENTOS, PruebaCripta.MEMORIA, PruebaCripta.INVOCACIONES);
+    private static final List<String> RELIQUIAS = List.of("scroll", "stake", "chalice");
     private static final Map<String, String> COMBINACIONES = Map.of(
             "scroll", "altar", "stake", "chandelier", "chalice", "organ");
 
     private final String id;
-    private final int pesoObjetivo;
     private final CopyOnWriteArrayList<MensajeHistorial> historial = new CopyOnWriteArrayList<>();
     private final Object turno = new Object();
     private final Set<String> inventario = new LinkedHashSet<>(List.of("scroll", "stake"));
-    private final Deque<String> runas = new ArrayDeque<>();
-    private final Set<Camara> visitadas = EnumSet.of(Camara.A);
     private Idioma idioma;
-    private int vitalidad = 10;
     private int turnosEstancados;
+    private int pistasSolicitadas;
     private int sellosResueltos;
-    private int minimo = PESO_MINIMO;
-    private int maximo = PESO_MAXIMO;
-    private int calibraciones = INTENTOS_CALIBRACION;
+    private int fase = 1;
+    private boolean descubrimientoRevelado;
     private String seleccion;
-    private Camara camara = Camara.A;
 
-    public EscapeSession(String id, Idioma idioma, int pesoObjetivo) {
-        if (pesoObjetivo < PESO_MINIMO || pesoObjetivo > PESO_MAXIMO) {
-            throw new IllegalArgumentException("Peso fuera del intervalo inicial");
-        }
+    public EscapeSession(String id, Idioma idioma) {
         this.id = id;
         this.idioma = idioma;
-        this.pesoObjetivo = pesoObjetivo;
-        ACTIVACION_RUNAS.forEach(runas::push);
     }
 
     public String id() {
@@ -60,14 +45,18 @@ public final class EscapeSession {
     }
 
     public synchronized EstadoPartida estado() {
-        return new EstadoPartida(id, idioma, resultado(), vitalidad, turnosEstancados, sellosResueltos,
+        return new EstadoPartida(id, idioma, resultado(), turnosEstancados, sellosResueltos,
                 Map.of("altar", estadoSello(1), "organ", estadoSello(2), "chandelier", estadoSello(3),
                         "chest", inventario.contains("chalice") ? "OPEN" : "CLOSED",
                         "scroll", "COLLECTED", "stake", "COLLECTED",
                         "chalice", inventario.contains("chalice") ? "COLLECTED" : "HIDDEN"),
-                List.copyOf(inventario), seleccion, new EstadoPartida.Calibracion(minimo, maximo, calibraciones),
-                sellosResueltos >= 2 ? camara.name() : null,
-                sellosResueltos >= 2 ? visitadas.stream().map(Enum::name).collect(Collectors.toUnmodifiableSet()) : Set.of());
+                List.copyOf(inventario), seleccion, null, null, Set.of(),
+                Map.of("altar", faseVisible(1), "organ", faseVisible(2), "chandelier", faseVisible(3)),
+                RELIQUIAS.stream().filter(reliquia -> !inventario.contains(reliquia)).toList());
+    }
+
+    private int faseVisible(int sello) {
+        return sellosResueltos >= sello ? 3 : sellosResueltos + 1 == sello ? fase : 1;
     }
 
     public synchronized void cambiarIdioma(Idioma nuevo) {
@@ -83,27 +72,69 @@ public final class EscapeSession {
     }
 
     public synchronized ResultadoAccion inspeccionar(String elemento) {
+        if (!terminada() && fase == 1
+                && sellosResueltos < 2 && pruebaActual().elemento().equals(elemento)) {
+            descubrimientoRevelado = true;
+        }
+        return observar(elemento);
+    }
+
+    public synchronized ResultadoAccion observar(String elemento) {
         String mensaje = switch (elemento) {
-            case "altar" -> sellosResueltos >= 1 ? texto("La balanza duerme.", "The scales are quiet.")
-                    : texto("Calibra un peso entre %d y %d. Quedan %d lecturas.",
-                            "Calibrate a weight between %d and %d. %d readings left.").formatted(minimo, maximo, calibraciones);
-            case "organ" -> sellosResueltos == 0 ? bloqueado() : sellosResueltos >= 2
-                    ? texto("El órgano guarda silencio.", "The organ is silent.")
-                    : texto("Las runas se encendieron así: A, Z, R, A. Apágalas una a una.",
-                            "The runes lit up like this: A, Z, R, A. Put them out one by one.");
-            case "chandelier" -> sellosResueltos < 2 ? bloqueado() : sellosResueltos == 3
-                    ? texto("La ruta está abierta.", "The route is open.")
-                    : texto("Estás en %s. Llega a F sin repetir cámara. Salidas desde aquí: %s.",
-                            "You are in %s. Reach F without revisiting a chamber. Exits from here: %s.")
-                            .formatted(camara, camara.salidas());
-            case "chest", "chalice" -> inventario.contains("chalice")
-                    ? texto("El cáliz está en el inventario.", "The chalice is in your inventory.")
-                    : texto("El cofre contiene un cáliz de ceniza.", "The chest holds an ash chalice.");
-            case "scroll" -> texto("El pergamino reacciona al altar.", "The scroll reacts to the altar.");
-            case "stake" -> texto("La estaca vibra cerca del candelabro.", "The stake vibrates near the chandelier.");
+            case "room" -> texto("Las velas iluminan un altar con pergaminos, un órgano, un candelabro y un cofre. ",
+                    "The candles illuminate an altar with scrolls, an organ, a chandelier and a chest. ")
+                    + pasoBreve();
+            case "altar" -> describir(PruebaCripta.FRAGMENTOS);
+            case "organ" -> describir(PruebaCripta.MEMORIA);
+            case "chandelier" -> describir(PruebaCripta.INVOCACIONES);
+            case "chest" -> describirCofre();
+            case "chalice" -> inventario.contains("chalice")
+                    ? texto("La ceniza del cáliz vibra cerca del órgano. Allí puede revelar la partitura.",
+                            "The ash in the chalice trembles by the organ. It can reveal the score there.")
+                    : texto("Busca el cáliz en el cofre.", "Look for the chalice in the chest.");
+            case "scroll" -> texto("El pergamino vibra junto a pasajes de significado parecido. Pruébalo en el altar.",
+                    "The scroll hums near passages with similar meanings. Try it on the altar.");
+            case "stake" -> texto("La plata vibra cerca del fuego. Úsala en el candelabro para revelar el cerrojo.",
+                    "Silver hums near the fire. Use it on the chandelier to reveal the bolt.");
             default -> texto("No veo ese elemento.", "I cannot see that object.");
         };
-        return respuesta(mensaje);
+        return new ResultadoAccion(mensaje, estado(), null, null);
+    }
+
+    public synchronized String guiaActual() {
+        if (terminada()) {
+            return cerrada().mensaje();
+        }
+        return sellosResueltos == PRUEBAS.size() ? faltaCaliz() : presentarFase(pruebaActual());
+    }
+
+    private PruebaCripta pruebaActual() {
+        return PRUEBAS.get(sellosResueltos);
+    }
+
+    private String describir(PruebaCripta prueba) {
+        int indice = PRUEBAS.indexOf(prueba);
+        if (indice > sellosResueltos) {
+            return bloqueado();
+        }
+        if (indice < sellosResueltos) {
+            return texto("La runa ya está desbloqueada.", "The rune is already unlocked.");
+        }
+        return presentarFase(prueba);
+    }
+
+    private String presentarFase(PruebaCripta prueba) {
+        return prueba.presentar(idioma, fase, fase > 1 || descubrimientoRevelado);
+    }
+
+    private String describirCofre() {
+        return texto("La obsidiana está fría. En el cierre hay un cáliz grabado junto a unos tubos de órgano. ",
+                "The obsidian is cold. A chalice and organ pipes are etched into the clasp. ")
+                + (inventario.contains("chalice")
+                        ? texto("La tapa está abierta. El cáliz está en el inventario.",
+                                "The lid is open. The chalice is in your inventory.")
+                        : texto("La tapa cede si la levantas. Dentro brilla un cáliz de ceniza.",
+                                "The lid gives if you lift it. An ash chalice gleams inside."));
     }
 
     public synchronized ResultadoAccion recoger(String reliquia) {
@@ -117,8 +148,8 @@ public final class EscapeSession {
             return respuesta(texto("Esa reliquia no está disponible.", "That relic is unavailable."));
         }
         inventario.add(reliquia);
-        progreso();
-        return respuesta(texto("Cofre abierto. Cáliz de ceniza recogido.", "Chest opened. Ash chalice collected."));
+        return terminada() ? desenlace(texto("Recuperas el cáliz y cruzas la salida. Has escapado.",
+                "You recover the chalice and cross the threshold. You escaped.")) : respuesta(describirCofre());
     }
 
     public synchronized ResultadoAccion seleccionar(String reliquia) {
@@ -137,122 +168,130 @@ public final class EscapeSession {
         if (terminada()) {
             return cerrada();
         }
+        int indice = PRUEBAS.stream().map(PruebaCripta::elemento).toList().indexOf(elemento);
         if (!inventario.contains(reliquia)) {
-            return respuesta(texto("Esa reliquia no está en tu inventario.", "That relic is not in your inventory."));
+            return rechazarUso(indice,
+                    texto("Esa reliquia no está en tu inventario.", "That relic is not in your inventory."));
         }
         seleccion = null;
         if (!elemento.equals(COMBINACIONES.get(reliquia))) {
-            return respuesta(texto("La reliquia no reacciona aquí.", "The relic does not react here."));
+            return rechazarUso(indice, texto("La reliquia no reacciona aquí.", "The relic does not react here."));
         }
-        return inspeccionar(elemento);
+        if (indice > sellosResueltos) {
+            return rechazarUso(indice, bloqueado());
+        }
+        if (indice == sellosResueltos && fase == 1) {
+            descubrimientoRevelado = true;
+        }
+        return respuesta(observar(elemento).mensaje());
+    }
+
+    private ResultadoAccion rechazarUso(int indice, String mensaje) {
+        if (indice == sellosResueltos) {
+            return fallar(mensaje);
+        }
+        return indice > sellosResueltos
+                ? new ResultadoAccion(mensaje, estado(), null, null, PRUEBAS.get(indice).elemento())
+                : respuesta(mensaje);
     }
 
     public synchronized ResultadoAccion resolver(int sello, String intento) {
         if (terminada()) {
             return cerrada();
         }
-        if (sello < 1 || sello > 3) {
+        if (sello < 1 || sello > PRUEBAS.size()) {
             return respuesta(texto("Ese sello no existe.", "That seal does not exist."));
         }
         if (sello != sellosResueltos + 1) {
-            return respuesta(sello <= sellosResueltos
-                    ? texto("Ese sello ya está roto.", "That seal is already broken.") : bloqueado());
+            return sello <= sellosResueltos ? respuesta(texto("Ese sello ya está roto.", "That seal is already broken."))
+                    : new ResultadoAccion(bloqueado(), estado(), null, null, PRUEBAS.get(sello - 1).elemento());
         }
-        return switch (sello) {
-            case 1 -> calibrar(intento);
-            case 2 -> apagarRuna(intento);
-            default -> cruzar(intento);
-        };
+        if (fase == 1 && !descubrimientoRevelado) {
+            return fallar(guiaActual());
+        }
+        if (intento == null || !pruebaActual().acepta(fase, intento)) {
+            return fallar(texto("La runa rechaza la elección. Revisa la inscripción.",
+                    "The rune rejects that choice. Read the inscription again."));
+        }
+        if (fase < 3) {
+            avanzarFase();
+            return respuesta(guiaActual());
+        }
+        return romperSello(texto("El sello cede. La piedra tiene mejores modales que antes.",
+                "The seal gives way. The stone has better manners now."));
     }
 
     public synchronized ResultadoAccion solicitarPista() {
-        return terminada() ? cerrada() : respuesta(pista());
+        if (terminada()) {
+            return cerrada();
+        }
+        if (sellosResueltos == PRUEBAS.size() || (fase == 1 && !descubrimientoRevelado)) {
+            return respuesta(guiaActual());
+        }
+        String mensaje = pista(pistasSolicitadas);
+        pistasSolicitadas = 1;
+        return new ResultadoAccion(mensaje, estado(), null, null);
+    }
+
+    public synchronized String contextoConversacional() {
+        if (terminada()) {
+            return texto("La cripta está superada y el diagnóstico pedagógico está disponible.",
+                    "The crypt has been cleared and the learning report is available.");
+        }
+        if (sellosResueltos == PRUEBAS.size()) {
+            return texto("La puerta está abierta y queda el cáliz del cofre.",
+                    "The gate is open and the chalice in the chest is still missing.");
+        }
+        String intentos = switch (turnosEstancados) {
+            case 0 -> texto("Aún no ha fallado un intento en esta fase.", "No attempt has failed in this phase.");
+            case 1 -> texto("Ya hubo un intento sin progreso en esta fase.", "An attempt did not advance this phase.");
+            default -> texto("Ya hubo varios intentos sin progreso. Explica el criterio con otra analogía.",
+                    "Several attempts did not advance the phase. Explain the criterion with a different analogy.");
+        };
+        return pruebaActual().contextoConversacional(idioma, fase) + " " + intentos;
+    }
+
+    public synchronized String siguientePaso() {
+        if (terminada()) {
+            return texto("Si te queda curiosidad, abre el diagnóstico de la expedición.",
+                    "If you are still curious, open the expedition report.");
+        }
+        return sellosResueltos == PRUEBAS.size() || (fase == 1 && !descubrimientoRevelado) ? guiaActual() : pista(0);
+    }
+
+    public synchronized String pasoBreve() {
+        String paso = siguientePaso();
+        int fin = paso.indexOf(". ");
+        return fin < 0 ? paso : paso.substring(0, fin + 1);
     }
 
     public synchronized String diagnostico(boolean extenso) {
-        return terminada() ? DiagnosticoJava.explicar(idioma, extenso) : null;
-    }
-
-    private ResultadoAccion calibrar(String intento) {
-        int peso;
-        try {
-            peso = Integer.parseInt(intento);
-        } catch (NumberFormatException e) {
-            return respuesta(texto("Indica un peso entero.", "Enter a whole-number weight."));
-        }
-        if (peso < PESO_MINIMO || peso > PESO_MAXIMO) {
-            return respuesta(texto("El peso debe estar entre 1 y 100.", "The weight must be between 1 and 100."));
-        }
-        calibraciones--;
-        if (peso == pesoObjetivo) {
-            return romperSello(texto("La balanza se equilibra. El órgano despierta.", "The scales balance. The organ awakens."));
-        }
-        int anteriorMinimo = minimo;
-        int anteriorMaximo = maximo;
-        if (peso < pesoObjetivo) {
-            minimo = Math.max(minimo, peso + 1);
-        } else {
-            maximo = Math.min(maximo, peso - 1);
-        }
-        if (minimo != anteriorMinimo || maximo != anteriorMaximo) {
-            progreso();
-        } else {
-            turnosEstancados++;
-        }
-        vitalidad--;
-        if (calibraciones == 0) {
-            return desenlace(texto("La balanza ha agotado sus lecturas.", "The scales have run out of readings."));
-        }
-        return respuesta(peso < pesoObjetivo ? texto("Demasiado ligero.", "Too light.")
-                : texto("Demasiado pesado.", "Too heavy."));
-    }
-
-    private ResultadoAccion apagarRuna(String intento) {
-        if (!ACTIVACION_RUNAS.contains(intento)) {
-            return respuesta(texto("Solo hay runas A, Z y R.", "The runes are A, Z and R."));
-        }
-        if (!intento.equals(runas.peek())) {
-            return fallar(texto("Esa runa sigue atrapada bajo otra.", "That rune is still trapped under another."));
-        }
-        runas.pop();
-        progreso();
-        return runas.isEmpty() ? romperSello(texto("El órgano calla. El candelabro ilumina la ruta.",
-                "The organ falls silent. The chandelier lights the way."))
-                : respuesta(texto("Una runa se apaga.", "One rune goes out."));
-    }
-
-    private ResultadoAccion cruzar(String intento) {
-        Camara destino;
-        try {
-            destino = Camara.valueOf(intento);
-        } catch (IllegalArgumentException e) {
-            return respuesta(texto("Indica una cámara de la A a la F.", "Enter a chamber from A to F."));
-        }
-        if (visitadas.contains(destino) || !camara.salidas().contains(destino)) {
-            return fallar(texto("La cripta rechaza esa compuerta. Sigues aquí.",
-                    "The crypt rejects that gate. You stay here."));
-        }
-        camara = destino;
-        visitadas.add(destino);
-        progreso();
-        return destino == Camara.F ? romperSello(texto("La salida cede. Has escapado.", "The exit gives way. You escaped."))
-                : inspeccionar("chandelier");
+        return terminada() ? DiagnosticoSpringAi.explicar(idioma, extenso) : null;
     }
 
     private ResultadoAccion romperSello(String mensaje) {
         sellosResueltos++;
+        fase = 1;
+        descubrimientoRevelado = false;
         progreso();
-        return terminada() ? desenlace(mensaje) : respuesta(mensaje);
+        return terminada() ? desenlace(mensaje + texto(" Has escapado.", " You escaped."))
+                : respuesta(mensaje + " " + guiaActual());
     }
 
     private ResultadoAccion fallar(String mensaje) {
-        vitalidad--;
-        turnosEstancados++;
-        return terminada() ? desenlace(mensaje) : respuesta(mensaje);
+        turnosEstancados = Math.min(UMBRAL_PISTA + 1, turnosEstancados + 1);
+        return new ResultadoAccion(mensaje, estado(), turnosEstancados == UMBRAL_PISTA
+                ? siguientePaso() : null, null, pruebaActual().elemento());
+    }
+
+    private void avanzarFase() {
+        fase++;
+        progreso();
     }
 
     private void progreso() {
         turnosEstancados = 0;
+        pistasSolicitadas = 0;
     }
 
     private String estadoSello(int sello) {
@@ -263,14 +302,11 @@ public final class EscapeSession {
     }
 
     private String resultado() {
-        if (sellosResueltos == 3) {
-            return "VICTORY";
-        }
-        return vitalidad == 0 || (sellosResueltos == 0 && calibraciones == 0) ? "DEFEAT" : "PLAYING";
+        return terminada() ? "VICTORY" : "PLAYING";
     }
 
     private boolean terminada() {
-        return !resultado().equals("PLAYING");
+        return sellosResueltos == PRUEBAS.size() && inventario.containsAll(RELIQUIAS);
     }
 
     private ResultadoAccion cerrada() {
@@ -281,41 +317,27 @@ public final class EscapeSession {
         return texto("Primero rompe el sello anterior.", "Break the previous seal first.");
     }
 
+    private String faltaCaliz() {
+        return texto("Recoge el cáliz de ceniza en el cofre. La puerta ya está abierta.",
+                "Fetch the ash chalice from the chest. The gate is already open.");
+    }
+
     private String texto(String es, String en) {
         return idioma.texto(es, en);
     }
 
-    private String pista() {
-        return switch (sellosResueltos) {
-            case 0 -> texto("Prueba en el centro. La balanza odia que cuentes de uno en uno.",
-                    "Try the middle. The scales hate counting one by one.");
-            case 1 -> texto("Piensa en platos apilados. Retira el de arriba.", "Think of stacked plates. Take the top one.");
-            default -> texto("Recuerda por dónde pasaste. Las compuertas no aprecian las segundas visitas.",
-                    "Remember where you have been. Gates dislike second visits.");
-        };
+    private String pista(int nivel) {
+        String orientacion = pruebaActual().pista(idioma, fase);
+        return nivel == 0 ? orientacion : orientacion + " "
+                + texto("Descarta lo que contradiga la inscripción.", "Rule out what contradicts the inscription.");
     }
 
     private ResultadoAccion respuesta(String mensaje) {
-        return new ResultadoAccion(mensaje, estado(),
-                !terminada() && turnosEstancados >= UMBRAL_PISTA ? pista() : null, null);
+        return new ResultadoAccion(mensaje, estado(), null, null);
     }
 
     private ResultadoAccion desenlace(String mensaje) {
         return new ResultadoAccion(mensaje, estado(), null, diagnostico(false));
     }
 
-    private enum Camara {
-        A, B, C, D, E, F;
-
-        List<Camara> salidas() {
-            return switch (this) {
-                case A -> List.of(B, C);
-                case B -> List.of(A, D);
-                case C -> List.of(A, E);
-                case D -> List.of(B, F);
-                case E -> List.of(C, D);
-                case F -> List.of();
-            };
-        }
-    }
 }
